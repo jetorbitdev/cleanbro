@@ -619,6 +619,17 @@ final class AppModel {
     /// Drops removed paths from every list and the scanned tree.
     private func applyRemoved(_ r: DeleteResult, sizes items: [(path: String, size: Int64)]) {
         let gone = Set(r.removed)
+        /// `path` itself or a folder above it was removed. Walks up the path with set
+        /// lookups, so the cost doesn't grow with the number of removed items.
+        func isGone(_ path: String) -> Bool {
+            if gone.contains(path) { return true }
+            var p = Substring(path)
+            while let slash = p.lastIndex(of: "/"), slash > p.startIndex {
+                p = p[..<slash]
+                if gone.contains(String(p)) { return true }
+            }
+            return false
+        }
 
         // junk
         for i in junk.indices { junk[i].items.removeAll { gone.contains($0.path) } }
@@ -628,16 +639,17 @@ final class AppModel {
         if tree != nil {
             let sizes = Dictionary(items.map { ($0.path, $0.size) }, uniquingKeysWith: { a, _ in a })
             for p in r.removed { applyRemoval(p, size: sizes[p] ?? 0) }
-            files.removeAll { f in gone.contains(f.path) || r.removed.contains { f.path.hasPrefix($0 + "/") } }
+            files.removeAll { isGone($0.path) }
             revision += 1
         }
         if !dupes.isEmpty {
             for i in dupes.indices {
-                dupes[i].items.removeAll { f in gone.contains(f.path) || r.removed.contains { f.path.hasPrefix($0 + "/") } }
+                dupes[i].items.removeAll { isGone($0.path) }
             }
             dupes.removeAll { $0.items.count < 2 }
         }
-        for t in Tool.allCases { marks[t]?.subtract(gone) }
+        // also drops marks on things that were inside a removed folder
+        for t in Tool.allCases { marks[t] = marks[t]?.filter { !isGone($0) } }
         refreshVolume()
         refreshTrash()
     }

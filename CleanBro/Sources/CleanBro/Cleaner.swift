@@ -127,12 +127,34 @@ enum DeepCleaner {
             h, h + "/Library", h + "/Documents", h + "/Desktop", h + "/Downloads",
             h + "/Movies", h + "/Music", h + "/Pictures", h + "/Applications", h + "/Public",
             h + "/Library/Caches", h + "/Library/Logs", h + "/.Trash",
+            // whole data stores: their children may go (e.g. an uninstalled app's folder),
+            // the store itself never; Mobile Documents is iCloud Drive, removing it syncs everywhere
+            h + "/Library/Application Support", h + "/Library/Containers", h + "/Library/Group Containers",
+            h + "/Library/Preferences", h + "/Library/Mobile Documents", h + "/Library/CloudStorage",
+            h + "/Library/Mail", h + "/Library/Messages", h + "/Library/Photos",
+            "/Library/Application Support", "/Library/Preferences", "/Library/LaunchDaemons",
+            "/Library/LaunchAgents", "/Library/PrivilegedHelperTools",
         ]
         if exact.contains(p) { return true }
-        for prefix in ["/System/", "/usr/", "/bin/", "/sbin/", "/private/var/db/"] where p.hasPrefix(prefix) {
+        let inside = ["/System/", "/usr/", "/bin/", "/sbin/", "/private/var/db/",
+                      // passwords and keys: nothing in here is junk
+                      h + "/Library/Keychains/", h + "/.ssh/", h + "/.gnupg/"]
+        for prefix in inside where p.hasPrefix(prefix) || p + "/" == prefix {
             return true
         }
+        if isInsideMediaLibrary(p) { return true }
         return p.split(separator: "/").count < 2
+    }
+
+    /// Photos/Music/TV libraries are databases: removing a file inside one corrupts it.
+    /// The library as a whole can still be removed.
+    private static let libraryExts: Set<String> = ["photoslibrary", "photolibrary", "musiclibrary", "tvlibrary", "aplibrary"]
+
+    private static func isInsideMediaLibrary(_ path: String) -> Bool {
+        path.split(separator: "/").dropLast().contains { comp in
+            guard let dot = comp.lastIndex(of: ".") else { return false }
+            return libraryExts.contains(comp[comp.index(after: dot)...].lowercased())
+        }
     }
 
     static func delete(_ targets: [(path: String, size: Int64)], mode: DeleteMode) -> DeleteResult {

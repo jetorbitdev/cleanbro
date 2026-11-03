@@ -166,7 +166,7 @@ enum AppUninstaller {
             for n in FS.list(dir) ?? [] {
                 let p = FS.join(dir, n)
                 let isLaunchd = dir.hasSuffix("/LaunchAgents") || dir.hasSuffix("/LaunchDaemons")
-                var match = classify(n, ids: ids, names: names, families: families, vendors: vendors)
+                var match = classify(n, ids: ids, names: names, families: families, vendors: vendors, appPath: app.path)
                 if isLaunchd, let prog = launchProgram(p) {
                     if prog.hasPrefix(app.path + "/") { match = .sure }
                     if match == .sure, prog.hasPrefix("/Library/PrivilegedHelperTools/") { helpers.append(prog) }
@@ -188,19 +188,36 @@ enum AppUninstaller {
     }
 
     private static func classify(_ file: String, ids: Set<String>, names: Set<String>,
-                                 families: Set<String>, vendors: Set<String>) -> UninstallItem.Match? {
+                                 families: Set<String>, vendors: Set<String>, appPath: String) -> UninstallItem.Match? {
         var stem = file.lowercased()
         for ext in [".plist", ".savedstate", ".binarycookies"] where stem.hasSuffix(ext) {
             stem = String(stem.dropLast(ext.count))
         }
         func related(to id: String) -> Bool {
-            // exact, "id.helper", or a group container "TEAMID.id"
-            stem == id || stem.hasPrefix(id + ".") || stem.hasSuffix("." + id)
+            // exact, or a group container "TEAMID.id"
+            if stem == id || stem.hasSuffix("." + id) { return true }
+            // "id.helper" is the app's own, unless it is the bundle ID of another app
+            // ("com.google.chrome.for.testing" is not Google Chrome's)
+            return stem.hasPrefix(id + ".") && !belongsToOtherApp(stem, below: id, appPath: appPath)
         }
         if ids.contains(where: related) || names.contains(stem) { return .sure }
         if families.contains(where: related) { return .maybe }
         if vendors.contains(where: { stem.hasPrefix($0 + ".") || stem.contains("." + $0 + ".") }) { return .maybe }
         return nil
+    }
+
+    /// True when `stem` ("com.vendor.app.x.y") or an ID between it and `id` is registered
+    /// with Launch Services as an app outside `appPath`.
+    private static func belongsToOtherApp(_ stem: String, below id: String, appPath: String) -> Bool {
+        var candidate = id
+        for part in stem.dropFirst(id.count + 1).split(separator: ".") {
+            candidate += "." + part
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: candidate),
+               url.path != appPath && !url.path.hasPrefix(appPath + "/") {
+                return true
+            }
+        }
+        return false
     }
 
     private static func launchProgram(_ plist: String) -> String? {
