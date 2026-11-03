@@ -21,7 +21,7 @@ jobs:
     name: CleanBro.app
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Pilih Xcode 16
         run: |
@@ -37,7 +37,7 @@ jobs:
           fi
           echo "BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: CleanBro/.build
           key: spm-${{ runner.os }}-${{ hashFiles('CleanBro/Package.swift', 'CleanBro/Package.resolved') }}
@@ -53,7 +53,7 @@ jobs:
           codesign --verify --deep --strict "$APP"
           plutil -p "$APP/Contents/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: CleanBro
           path: CleanBro/build/CleanBro.zip
@@ -63,11 +63,12 @@ jobs:
     name: cekdisk
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false # tidak ada dependency (go.sum)
 
       - name: Vet
         run: go vet ./...
@@ -81,7 +82,7 @@ jobs:
           lipo -archs dist/cekdisk
           tar -C dist -czf dist/cekdisk-macos-universal.tar.gz cekdisk
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cekdisk
           path: dist/cekdisk-macos-universal.tar.gz
@@ -95,7 +96,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
