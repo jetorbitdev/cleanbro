@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>CleanBro Thumbnail</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#040b0d}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
+.a{position:absolute}
+#bg{position:absolute;inset:0;background:radial-gradient(1400px 900px at 62% 50%,#0d3437 0%,#06171a 50%,#030809 100%)}
+#grid{position:absolute;inset:0;background-image:radial-gradient(rgba(94,234,212,.16) 1.2px,transparent 1.6px);background-size:44px 44px;-webkit-mask-image:radial-gradient(900px 600px at 65% 50%,#000 20%,transparent 75%)}
+#glow{position:absolute;left:700px;top:-100px;width:1400px;height:1300px;border-radius:50%;background:radial-gradient(closest-side,rgba(45,212,191,.38),rgba(45,212,191,0))}
+#vign{position:absolute;inset:0;background:radial-gradient(1300px 820px at 50% 50%,transparent 55%,rgba(0,0,0,.6) 100%)}
+.acc{color:#5eead4}
+#brand{left:120px;top:150px;display:flex;align-items:center;gap:22px;font-size:58px;font-weight:800;letter-spacing:-.04em}
+#brand .lg{width:96px;height:96px;filter:drop-shadow(0 0 30px rgba(94,234,212,.45))}
+#head{left:116px;top:300px;font-size:128px;font-weight:800;letter-spacing:-.045em;line-height:1.0}
+#head .big{font-size:150px;text-shadow:0 0 50px rgba(94,234,212,.45)}
+#sub{left:120px;top:770px;font-size:36px;font-weight:500;color:rgba(255,255,255,.75)}
+#pills{left:120px;top:850px;display:flex;gap:16px}
+.pill{display:inline-flex;align-items:center;gap:10px;font-size:28px;font-weight:600;padding:12px 26px 12px 18px;border-radius:999px;border:1.5px solid rgba(94,234,212,.5);background:rgba(94,234,212,.09)}
+#shot{left:980px;top:170px;width:1180px;perspective:2200px}
+#shot img{width:100%;display:block;border-radius:18px;transform:rotateY(-16deg) rotateX(4deg);transform-origin:0 50%;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 50px 140px rgba(0,0,0,.65),0 0 160px rgba(94,234,212,.22)}
+
+/* vertical 1080x1920 */
+html.v,html.v body{width:1080px;height:1920px}
+.v #bg{background:radial-gradient(1100px 1500px at 50% 55%,#0d3437 0%,#06171a 50%,#030809 100%)}
+.v #grid{-webkit-mask-image:radial-gradient(650px 1000px at 50% 55%,#000 20%,transparent 75%)}
+.v #glow{left:-300px;top:700px;width:1680px;height:1400px}
+.v #vign{background:radial-gradient(820px 1300px at 50% 50%,transparent 55%,rgba(0,0,0,.6) 100%)}
+.v #brand{left:0;right:0;top:330px;justify-content:center;font-size:56px}
+.v #brand .lg{width:92px;height:92px}
+.v #head{left:0;right:0;top:470px;text-align:center;font-size:118px}
+.v #head .big{font-size:150px}
+.v #sub,.v #pills{display:none}
+.v #shot{left:110px;top:1000px;width:860px;perspective:2600px}
+.v #shot img{transform:rotateX(9deg);transform-origin:50% 0}
+</style></head>
+<body><div id="bg"></div><div id="grid"></div><div id="glow"></div>
+<div id="shot" class="a"><img id="img"></div>
+<div id="brand" class="a"><span class="lg" id="lg"></span>CleanBro</div>
+<div id="head" class="a">Free up<br><span class="big acc">24.6 GB</span><br>in one click.</div>
+<div id="sub" class="a">The native disk cleaner for macOS</div>
+<div id="pills" class="a"><span class="pill">✓ Free</span><span class="pill">✓ Open Source</span><span class="pill">✓ Made for Mac</span></div>
+<div id="vign"></div>
+<script>
+const V=new URLSearchParams(location.search).has('v');
+if(V)document.documentElement.classList.add('v');
+document.getElementById('img').src=V?'thumb/win_v.png':'thumb/win_h.png';
+document.getElementById('lg').innerHTML=`<svg viewBox="0 0 240 240" width="100%" height="100%"><defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ff0dc"/><stop offset=".55" stop-color="#14b8a6"/><stop offset="1" stop-color="#0b6b66"/></linearGradient>
+<linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+<rect x="8" y="8" width="224" height="224" rx="58" fill="url(#g)"/><rect x="8" y="8" width="224" height="224" rx="58" fill="url(#h)"/>
+<path d="M112 52C118 100 130 112 178 118C130 124 118 136 112 184C106 136 94 124 46 118C94 112 106 100 112 52Z" fill="#fff"/>
+<path d="M172 50C174 66 178 70 194 72C178 74 174 78 172 94C170 78 166 74 150 72C166 70 170 66 172 50Z" fill="#fff" opacity=".9"/>
+<circle cx="174" cy="170" r="10" fill="#fff" opacity=".8"/></svg>`;
+</script></body></html>

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>CleanBro Intro</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#040b0d}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;color:#fff}
+.a{position:absolute}
+.hid{display:none!important}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden}
+.scene{position:absolute;inset:0}
+.ctr{left:0;right:0;text-align:center}
+.line{white-space:nowrap}
+.w{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .04em .14em;margin:0 -.04em -.14em}
+.wi{display:inline-block}
+.acc{color:#5eead4}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.tab{font-variant-numeric:tabular-nums}
+#bg{position:absolute;inset:0;background:radial-gradient(1400px 900px at 50% 45%,#0b2b2e 0%,#06171a 50%,#030809 100%)}
+#grid{position:absolute;inset:-100px;background-image:radial-gradient(rgba(94,234,212,.16) 1.2px,transparent 1.6px);background-size:44px 44px;-webkit-mask-image:radial-gradient(900px 600px at 50% 50%,#000 20%,transparent 75%)}
+.glow{position:absolute;border-radius:50%;pointer-events:none}
+#glowT{left:260px;top:-60px;width:1400px;height:1200px;background:radial-gradient(closest-side,rgba(45,212,191,.32),rgba(45,212,191,0))}
+#glowR{left:360px;top:0;width:1200px;height:1080px;background:radial-gradient(closest-side,rgba(255,69,58,.42),rgba(255,69,58,0))}
+#vign{position:absolute;inset:0;background:radial-gradient(1300px 820px at 50% 50%,transparent 55%,rgba(0,0,0,.6) 100%)}
+#fade{position:absolute;inset:0;background:#000}
+
+/* scene 1 */
+#ring{left:740px;top:170px;width:440px;height:440px}
+#ringC{left:740px;top:170px;width:440px;height:440px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#pct{font-size:124px;font-weight:700;letter-spacing:-.04em;line-height:1}
+#notif{left:1450px;top:36px;width:440px;height:88px;border-radius:18px;background:rgba(52,56,60,.86);border:1px solid rgba(255,255,255,.12);box-shadow:0 20px 50px rgba(0,0,0,.5);display:flex;gap:14px;align-items:center;padding:0 18px}
+
+/* scene 2 */
+.chip{position:absolute;left:0;top:0;width:236px;height:58px;border-radius:14px;background:rgba(18,40,44,.92);border:1px solid rgba(255,255,255,.14);display:flex;align-items:center;gap:12px;padding:0 12px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.chip .ci{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+.chip .cn{font-size:17px;font-weight:600;white-space:nowrap}
+.chip .cs{font-size:13px;color:rgba(255,255,255,.6);margin-top:1px}
+.big{font-size:96px;font-weight:800;letter-spacing:-.035em;line-height:1.05}
+
+/* app window */
+#winWrap{left:340px;top:236px;width:1240px;height:720px;perspective:2000px;transform:scale(1.12);transform-origin:50% 0}
+#win{position:absolute;inset:0;border-radius:14px;overflow:hidden;background:#fff;color:#1d1d1f;box-shadow:0 0 0 1px rgba(255,255,255,.1),0 50px 140px rgba(0,0,0,.6),0 0 180px rgba(94,234,212,.14);transform-origin:50% 100%;font-family:-apple-system,"SF Pro Text",sans-serif}
+#side{position:absolute;left:0;top:0;bottom:0;width:240px;background:#eef0f1;border-right:1px solid rgba(0,0,0,.08)}
+.tl{position:absolute;top:18px;width:12px;height:12px;border-radius:50%}
+.sec{position:absolute;left:20px;font-size:11px;font-weight:600;color:#8a8f94}
+.row{position:absolute;left:10px;width:220px;height:30px;display:flex;align-items:center;gap:9px;padding:0 10px;font-size:13px;border-radius:6px}
+.row svg{width:16px;height:16px;flex:none}
+.row .meta{margin-left:auto;font-size:11px;opacity:.75}
+#sel{position:absolute;left:10px;width:220px;height:30px;border-radius:6px;background:oklch(0.55 0.13 175)}
+#main{position:absolute;left:240px;top:0;right:0;bottom:0;background:#fff;overflow:hidden}
+.pane{position:absolute;inset:0}
+.hdr{position:absolute;left:0;right:0;top:0;height:52px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;padding:0 28px;font-size:14px;font-weight:600}
+.hdr .r{margin-left:auto;font-weight:400;color:#8a8f94;font-size:13px}
+.btn{position:absolute;height:40px;border-radius:8px;background:oklch(0.55 0.13 175);color:#fff;font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.foot{position:absolute;left:0;right:0;bottom:0;height:80px;border-top:1px solid rgba(0,0,0,.07);display:flex;align-items:center;padding:0 28px;font-size:13px;color:#6e7378}
+.lrow{position:absolute;left:28px;right:28px;display:flex;align-items:center;gap:14px;border-bottom:1px solid rgba(0,0,0,.06)}
+.cb{width:18px;height:18px;border-radius:5px;background:oklch(0.55 0.13 175);display:flex;align-items:center;justify-content:center;flex:none}
+.ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.t1{font-size:15px;font-weight:600;color:#1d1d1f}
+.t2{font-size:12.5px;color:#8a8f94;margin-top:2px}
+.sz{margin-left:auto;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.appic{border-radius:22%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex:none}
+#toast{left:50%;top:560px;transform:translateX(-50%);background:rgba(0,0,0,.85);color:#fff;font-size:14px;padding:11px 20px;border-radius:9px;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:12px;font-size:32px;font-weight:600;padding:14px 30px 14px 22px;border-radius:999px;border:1.5px solid rgba(94,234,212,.5);background:rgba(94,234,212,.09);margin:0 12px}
+
+/* ---- vertical (Reels 1080x1920) ---- */
+html.v,html.v body{width:1080px;height:1920px}
+body.v #stage{width:1080px;height:1920px}
+body.v #bg{background:radial-gradient(1100px 1500px at 50% 42%,#0b2b2e 0%,#06171a 50%,#030809 100%)}
+body.v #grid{-webkit-mask-image:radial-gradient(650px 1000px at 50% 45%,#000 20%,transparent 75%)}
+body.v #glowT{left:-300px;top:180px;width:1680px;height:1500px}
+body.v #glowR{left:-60px;top:190px;width:1200px;height:1100px}
+body.v #vign{background:radial-gradient(820px 1300px at 50% 50%,transparent 55%,rgba(0,0,0,.6) 100%)}
+body.v #ring,body.v #ringC{left:320px;top:520px}
+body.v #notif{left:230px;top:250px;width:620px}
+body.v #cntBox{left:80px!important;top:640px!important}
+body.v #flash{left:-60px!important;top:120px!important}
+body.v #sw1,body.v #sw2{left:540px!important;top:720px!important}
+body.v #logo3{left:390px!important;top:570px!important;width:300px!important;height:300px!important}
+body.v #wm3{top:910px!important;font-size:170px!important}
+body.v #tag3{top:1150px!important;font-size:52px!important;line-height:1.3}
+body.v #tag3 span{display:block!important}
+body.v #winWrap{left:90px;top:480px;width:900px;height:880px;transform:scale(1.15)}
+body.v #unList{left:0!important;right:0;width:auto!important;height:252px;bottom:auto!important;border-right:0!important;border-bottom:1px solid rgba(0,0,0,.07);overflow:hidden}
+body.v #unDetail{left:0!important;top:316px!important}
+body.v #unFoot{left:0!important}
+body.v #toast{top:auto;bottom:100px}
+body.v .lbar{display:none!important}
+body.v #sheet{left:230px!important;top:290px!important}
+body.v #logo8{left:420px!important;top:520px!important;width:240px!important;height:240px!important}
+body.v #wm8{top:790px!important;font-size:150px!important}
+body.v #pills{top:1010px!important}
+body.v #foot8{top:1180px!important;font-size:26px!important}
+</style></head>
+<body><div id="stage">
+  <div id="bg"></div><div id="grid"></div>
+  <div id="glowT" class="glow"></div><div id="glowR" class="glow"></div>
+  <canvas id="cv" width="1920" height="1080" class="a" style="left:0;top:0"></canvas>
+
+  <!-- SCENE 1: disk almost full -->
+  <div id="s1" class="scene">
+    <svg id="ring" class="a" viewBox="0 0 440 440">
+      <circle cx="220" cy="220" r="190" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="28"/>
+      <circle id="arc" cx="220" cy="220" r="190" fill="none" stroke="#5eead4" stroke-width="28" stroke-linecap="round" transform="rotate(-90 220 220)" stroke-dasharray="1193.8" stroke-dashoffset="1193.8"/>
+    </svg>
+    <div id="ringC" class="a">
+      <div id="pct" class="tab">0%</div>
+      <div style="font-size:26px;color:rgba(255,255,255,.7);margin-top:12px;font-weight:500">Macintosh HD</div>
+      <div id="avail" class="tab" style="font-size:20px;color:rgba(255,255,255,.5);margin-top:6px">512 GB available</div>
+    </div>
+    <div id="notif" class="a">
+      <div style="width:46px;height:46px;border-radius:11px;background:linear-gradient(#ff6b5a,#d93a2b);display:flex;align-items:center;justify-content:center;flex:none">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><rect x="3" y="7" width="18" height="10" rx="2.5"/><path d="M7 12h.01M11 12h6"/></svg>
+      </div>
+      <div><div style="font-size:16px;font-weight:600">Your disk is almost full</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.7);margin-top:3px">Save space by removing files you don't need.</div></div>
+      <div style="position:absolute;right:16px;top:12px;font-size:12px;color:rgba(255,255,255,.45)">now</div>
+    </div>
+  </div>
+
+  <!-- SCENE 2: junk piling -->
+  <div id="s2" class="scene">
+    <div id="chips"></div>
+    <div id="cntBox" class="a" style="left:160px;top:700px">
+      <div style="font-size:20px;letter-spacing:.2em;font-weight:600;color:#5eead4">JUNK FOUND</div>
+      <div id="cnt" class="tab" style="font-size:120px;font-weight:800;letter-spacing:-.04em;line-height:1.05;margin-top:6px">0.0 GB</div>
+    </div>
+  </div>
+
+  <!-- SCENE 3: logo reveal -->
+  <div id="s3" class="scene">
+    <div id="flash" class="a" style="left:360px;top:-170px;width:1200px;height:1200px;border-radius:50%;background:radial-gradient(closest-side,rgba(220,255,250,.95),rgba(94,234,212,.35) 40%,rgba(94,234,212,0))"></div>
+    <div id="sw1" class="a" style="left:960px;top:430px;width:10px;height:10px;border-radius:50%;border:3px solid rgba(94,234,212,.8)"></div>
+    <div id="sw2" class="a" style="left:960px;top:430px;width:10px;height:10px;border-radius:50%;border:2px solid rgba(94,234,212,.6)"></div>
+    <div id="logo3" class="a" style="left:830px;top:300px;width:260px;height:260px"></div>
+    <div id="wm3" class="a ctr" style="top:590px;font-size:150px;font-weight:800;letter-spacing:-.045em;line-height:1.1"></div>
+    <div id="tag3" class="a ctr" style="top:800px;font-size:42px;font-weight:500;color:rgba(255,255,255,.78);letter-spacing:-.01em"></div>
+  </div>
+
+  <!-- APP SCENES -->
+  <div id="sApp" class="scene">
+    <div id="appText"></div>
+    <div id="winWrap" class="a"><div id="win">
+      <div id="side">
+        <div class="tl" style="left:18px;background:#ff5f57"></div><div class="tl" style="left:38px;background:#febc2e"></div><div class="tl" style="left:58px;background:#28c840"></div>
+        <div class="a" style="left:20px;top:50px;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;letter-spacing:-.01em"><span id="miniLogo" style="width:22px;height:22px;display:inline-block"></span>CleanBro</div>
+        <div class="sec" style="top:93px">Tools</div>
+        <div id="sel" style="top:112px"></div>
+        <div id="rows"></div>
+        <div class="sec" style="top:193px">Analysis</div>
+        <div class="a" style="left:18px;right:18px;bottom:22px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="font-weight:500">Macintosh HD</span><span id="volFree" class="tab" style="color:#6e7378"></span></div>
+          <div style="height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden;margin-top:8px"><div id="volBar" style="height:100%;border-radius:3px;background:oklch(0.62 0.13 175)"></div></div>
+          <div id="volUsed" class="tab" style="font-size:11px;color:#8a8f94;margin-top:8px"></div>
+          <div style="height:1px;background:rgba(0,0,0,.08);margin:12px 0 10px"></div>
+          <div style="display:flex;align-items:center;gap:6px;color:#1d1d1f"><span style="opacity:.8">Trash</span><span id="trashSz" class="tab" style="margin-left:auto;color:#6e7378">3.4 GB</span></div>
+        </div>
+      </div>
+      <div id="main">
+        <!-- cleanup -->
+        <div id="pClean" class="pane">
+          <div class="hdr">Cleanup</div>
+          <div id="scanBox" class="a" style="left:0;right:0;top:52px;bottom:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px">
+            <div id="scanPct" class="tab" style="font-size:64px;font-weight:300;letter-spacing:-.03em">0%</div>
+            <div style="width:420px;height:6px;border-radius:3px;background:rgba(0,0,0,.07);overflow:hidden"><div id="scanBar" style="height:100%;background:oklch(0.55 0.13 175);width:0"></div></div>
+            <div id="scanPath" class="mono" style="font-size:13px;color:#8a8f94"></div>
+          </div>
+          <div id="resBox" class="a" style="inset:0">
+            <div class="a" style="left:28px;top:78px;display:flex;align-items:baseline;gap:12px"><span id="junkNum" class="tab" style="font-size:40px;font-weight:700;letter-spacing:-.02em">0.0 GB</span><span style="font-size:16px;color:#6e7378">can be cleaned</span></div>
+            <div id="cleanRows"></div>
+            <div id="cleanFoot" class="foot"><span>5 categories selected</span><div id="btnClean" class="btn" style="right:28px;top:20px;width:140px">Clean</div></div>
+          </div>
+          <div id="doneBox" class="a" style="left:0;right:0;top:52px;bottom:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+            <svg width="132" height="132" viewBox="0 0 132 132"><circle id="doneC" cx="66" cy="66" r="58" fill="none" stroke="oklch(0.55 0.13 175)" stroke-width="7" stroke-dasharray="364.4" stroke-dashoffset="364.4" transform="rotate(-90 66 66)" stroke-linecap="round"/><path id="doneK" d="M42 68l16 16 32-34" fill="none" stroke="oklch(0.55 0.13 175)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="80" stroke-dashoffset="80"/></svg>
+            <div style="font-size:40px;font-weight:700;letter-spacing:-.02em"><span id="freedNum" class="tab">24.6 GB</span> freed</div>
+            <div style="font-size:16px;color:#6e7378">Your Mac has room to breathe again.</div>
+          </div>
+        </div>
+        <!-- uninstall -->
+        <div id="pUn" class="pane">
+          <div class="hdr">Uninstall Apps<span class="r">9 apps</span></div>
+          <div id="unList" class="a" style="left:0;top:52px;width:380px;bottom:0;border-right:1px solid rgba(0,0,0,.07)"><div id="appRows"></div></div>
+          <div id="unDetail" class="a" style="left:380px;right:0;top:52px;bottom:0">
+            <div id="unHead" class="a" style="left:28px;top:28px;display:flex;gap:16px;align-items:center"></div>
+            <div id="unLbl" class="a" style="left:28px;top:128px;font-size:12px;font-weight:600;color:#8a8f94;letter-spacing:.04em">FILES TO REMOVE</div>
+            <div id="unFiles"></div>
+          </div>
+          <div id="unFoot" class="foot" style="left:380px"><span>6 items · 2.1 GB</span><div id="btnUn" class="btn" style="right:28px;top:20px;width:150px">Uninstall</div></div>
+          <div id="toast" class="a">Bloatware Pro uninstalled · 2.1 GB freed</div>
+        </div>
+        <!-- usage -->
+        <div id="pUse" class="pane">
+          <div class="hdr">Disk Usage<span class="r mono">~ · 412 GB</span></div>
+          <div id="useRows"></div>
+        </div>
+        <!-- large -->
+        <div id="pLarge" class="pane">
+          <div class="hdr">Large Files<span class="r">Files over 100 MB</span></div>
+          <div id="largeRows"></div>
+        </div>
+        <!-- stale -->
+        <div id="pStale" class="pane">
+          <div class="hdr">Stale Files<span class="r">Not modified in over a year</span></div>
+          <div id="staleRows"></div>
+        </div>
+        <!-- dupes -->
+        <div id="pDup" class="pane">
+          <div class="hdr">Duplicate Files<span class="r">SHA-256 verified</span></div>
+          <div class="a" style="left:28px;top:76px;display:flex;align-items:baseline;gap:12px"><span id="dupNum" class="tab" style="font-size:40px;font-weight:700;letter-spacing:-.02em">5.8 GB</span><span style="font-size:16px;color:#6e7378">wasted by duplicate files</span></div>
+          <div id="dupRows"></div>
+        </div>
+      </div>
+      <!-- confirm sheet -->
+      <div id="dim" class="a" style="inset:0;background:rgba(0,0,0,.22)"></div>
+      <div id="sheet" class="a" style="left:400px;top:170px;width:440px;border-radius:14px;background:#f6f6f7;box-shadow:0 0 0 .5px rgba(0,0,0,.2),0 30px 80px rgba(0,0,0,.35);padding:26px 24px 20px;text-align:center">
+        <div id="sheetIc" style="width:64px;height:64px;margin:0 auto"></div>
+        <div style="font-size:17px;font-weight:700;margin-top:14px">Move 8 items to the Trash?</div>
+        <div style="font-size:13.5px;color:#6e7378;margin-top:8px;line-height:1.45">5.8 GB of duplicates will be moved to the Trash.<br>You can put them back anytime.</div>
+        <div style="display:flex;gap:10px;margin-top:20px">
+          <div style="flex:1;height:38px;border-radius:8px;background:#e3e3e8;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500">Cancel</div>
+          <div id="btnTrash" style="flex:1;height:38px;border-radius:8px;background:oklch(0.55 0.13 175);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Move to Trash</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- SCENE 8: outro -->
+  <div id="s8" class="scene">
+    <div id="logo8" class="a" style="left:860px;top:190px;width:200px;height:200px"></div>
+    <div id="wm8" class="a ctr" style="top:420px;font-size:136px;font-weight:800;letter-spacing:-.045em;line-height:1.1"></div>
+    <div id="pills" class="a ctr" style="top:640px"></div>
+    <div id="foot8" class="a ctr" style="top:830px;font-size:24px;color:rgba(255,255,255,.55);letter-spacing:.02em">macOS 14+ &nbsp;·&nbsp; Apple Silicon &amp; Intel &nbsp;·&nbsp; GPL-3.0</div>
+  </div>
+
+  <div id="ripple" class="a" style="width:10px;height:10px;border-radius:50%;border:3px solid rgba(94,234,212,.9)"></div>
+  <svg id="cursor" class="a" width="34" height="46" viewBox="0 0 17 23" style="filter:drop-shadow(0 3px 5px rgba(0,0,0,.4))"><path d="M1 1v17.5l4.2-4.1 2.7 6.3 2.6-1.1-2.7-6.2H14z" fill="#000" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg>
+  <div id="vign"></div>
+  <div id="fade"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const V=new URLSearchParams(location.search).has('v');const W=V?1080:1920,H=V?1920:1080;
+if(V){document.documentElement.classList.add('v');document.body.classList.add('v');}
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const lerp=(a,b,x)=>a+(b-a)*x;
+const E={
+  lin:x=>x,
+  out:x=>1-Math.pow(1-x,3),
+  in:x=>x*x*x,
+  io:x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2,
+  expo:x=>x>=1?1:1-Math.pow(2,-10*x),
+  back:x=>{const c1=1.6,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)},
+};
+const P=(t,a,b,e=E.out)=>e(clamp((t-a)/(b-a)));
+const bump=(t,c,w)=>{const x=(t-c)/w;return Math.abs(x)<1?Math.cos(x*Math.PI/2)**2:0};
+const S=(el,o)=>{if(typeof el==='string')el=$(el);for(const k in o)el.style[k]=o[k]};
+const show=(el,on)=>{(typeof el==='string'?$(el):el).classList.toggle('hid',!on)};
+let seed=20251103;const R=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+const fmt=g=>g>=1?g.toFixed(1)+' GB':Math.round(g*1000)+' MB';
+const TEAL='oklch(0.55 0.13 175)';
+
+// ---------- logo
+const LOGO=id=>`<svg viewBox="0 0 240 240" width="100%" height="100%"><defs>
+<linearGradient id="lg${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6ff0dc"/><stop offset=".55" stop-color="#14b8a6"/><stop offset="1" stop-color="#0b6b66"/></linearGradient>
+<linearGradient id="hl${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+<rect x="8" y="8" width="224" height="224" rx="58" fill="url(#lg${id})"/>
+<rect x="8" y="8" width="224" height="224" rx="58" fill="url(#hl${id})"/>
+<path d="M112 52C118 100 130 112 178 118C130 124 118 136 112 184C106 136 94 124 46 118C94 112 106 100 112 52Z" fill="#fff"/>
+<path d="M172 50C174 66 178 70 194 72C178 74 174 78 172 94C170 78 166 74 150 72C166 70 170 66 172 50Z" fill="#fff" opacity=".9"/>
+<circle cx="174" cy="170" r="10" fill="#fff" opacity=".8"/></svg>`;
+$('#logo3').innerHTML=LOGO('a');$('#logo8').innerHTML=LOGO('b');$('#miniLogo').innerHTML=LOGO('c');$('#sheetIc').innerHTML=LOGO('d');
+// wordmarks: per-letter spans
+function letters(el,html){el.innerHTML=html.map(([s,c])=>[...s].map(ch=>`<span class="w"><span class="wi"${c?' style="color:#5eead4"':''}>${ch}</span></span>`).join('')).join('');el._w=[...el.querySelectorAll('.wi')];}
+letters($('#wm3'),[['Clean'],['Bro',1]]);letters($('#wm8'),[['Clean'],['Bro',1]]);
+
+// ---------- kinetic text lines
+function mkLine(parent,text,css){const d=document.createElement('div');d.className='a line';Object.assign(d.style,css);
+  d.innerHTML=text.split(' ').map(w=>{const acc=w.includes('_');w=w.replace(/_/g,'');return `<span class="w"><span class="wi${acc?' acc':''}">${w}</span></span>`}).join(' ');
+  parent.appendChild(d);d._w=[...d.querySelectorAll('.wi')];return d;}
+function animWords(ws,t,t0,t1,st=.07,d=.6,od=.3){
+  ws.forEach((w,i)=>{const pi=P(t,t0+i*st,t0+i*st+d,E.expo),po=t1==null?0:P(t,t1-od,t1,E.in);
+    w.style.transform=`translateY(${(1-pi)*105-po*70}%)`;w.style.opacity=pi*(1-po);});
+}
+function animLine(L,t,t0,t1,st,d,od){const vis=t>=t0-.01&&(t1==null||t<=t1+.01);L.style.display=vis?'':'none';if(vis)animWords(L._w,t,t0,t1,st,d,od);}
+
+// scene 1 headline
+const L1=mkLine($('#s1'),'Your Mac is running out of _space._',V?{left:'60px',right:'60px',top:'1100px',textAlign:'center',fontSize:'96px',fontWeight:800,letterSpacing:'-.035em',whiteSpace:'normal',lineHeight:'1.05'}:{left:0,right:0,top:'700px',textAlign:'center',fontSize:'84px',fontWeight:800,letterSpacing:'-.035em'});
+// scene 2 lines
+const s2el=$('#s2');
+const T2=V?{x:80,f:84,y:[300,400,500,330,440]}:{x:160,f:92,y:[330,440,550,370,480]};
+const L2=[['Caches.',3.1,T2.y[0]],['Logs.',3.93,T2.y[1]],['Leftover downloads…',4.62,T2.y[2]]].map(([s,t0,y])=>{const L=mkLine(s2el,s,{left:T2.x+'px',top:y+'px',fontSize:T2.f+'px',fontWeight:800,letterSpacing:'-.035em'});L._t0=t0;return L;});
+const L2b=[['They pile up,',6.12,T2.y[3]],['_quietly._',6.95,T2.y[4]]].map(([s,t0,y])=>{const L=mkLine(s2el,s,{left:T2.x+'px',top:y+'px',fontSize:T2.f+'px',fontWeight:800,letterSpacing:'-.035em'});L._t0=t0;return L;});
+// scene 3 tagline
+const tag=$('#tag3');tag.innerHTML='<span id="tagA">The native disk cleaner,</span> <span id="tagB" class="acc">built for macOS.</span>';
+// app headlines
+const AT=$('#appText');
+const KICK=[['01 · CLEANUP',13.15,18.35],['02 · UNINSTALL',18.55,23.4],['03 · ANALYZE',23.65,30.85],['SAFE BY DESIGN',31.05,33.75]].map(([s,a,b])=>{const L=mkLine(AT,s,{left:0,right:0,top:V?'250px':'58px',textAlign:'center',fontSize:V?'24px':'20px',fontWeight:700,letterSpacing:'.24em',color:'#5eead4'});L._a=a;L._b=b;return L;});
+const HEAD=[['Scan your Mac in seconds.',13.3,15.1],['Clear _gigabytes_ in one click.',15.2,18.35],['Remove apps completely.',18.7,20.6],['Leave _nothing_ behind.',20.7,23.4],
+  ['See where your space goes.',23.8,26.05],['_Large_ files.',26.15,27.25],['_Old_ files.',27.35,28.25],['_Duplicates._',28.33,29.38],['All in _one_ place.',29.46,30.85],['Nothing is deleted without _your_ _OK._',31.25,33.75]]
+  .map(([s,a,b])=>{const L=mkLine(AT,s,V?{left:'60px',right:'60px',top:'292px',textAlign:'center',fontSize:'78px',fontWeight:800,letterSpacing:'-.035em',whiteSpace:'normal',lineHeight:'1.04'}:{left:0,right:0,top:'88px',textAlign:'center',fontSize:'66px',fontWeight:800,letterSpacing:'-.035em'});L._a=a;L._b=b;return L;});
+
+// ---------- scene 2 chips
+const KC={c:'#4ea8ff',l:'#f5c542',d:'#a77bff',x:'#ff8a4c',t:'#9aa4ad',b:'#34d399'};
+const CH=[["Safari Cache",1.2,"c"],["Chrome Cache",2.4,"c"],["Spotify Cache",.86,"c"],["System Logs",.64,"l"],["Crash Reports",.31,"l"],["Diagnostics",.22,"l"],["setup.download",1.8,"d"],["movie.mp4.part",2.2,"d"],["file.crdownload",.74,"d"],["DerivedData",6.8,"x"],["node_modules",1.1,"x"],["Gradle Cache",1.6,"x"],["~/.cache",.9,"x"],["DeviceSupport",4.3,"x"],["Simulator Cache",2.9,"x"],["npm Cache",.78,"x"],["Trash",3.4,"t"],["Mail Downloads",.45,"d"],["Slack Cache",.62,"c"],["Xcode Archives",3.1,"x"],["Font Cache",.12,"c"],["Teams Cache",.98,"c"],["QuickLook",.09,"c"],["pip Cache",.41,"x"],["Homebrew Cache",1.3,"x"],["iOS Backups",5.2,"b"]];
+const FILEIC='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg>';
+const ROWS=[4,4,4,3,3,3,2,2,1];const CX=V?540:1385,FLOOR=V?1660:1012;const SUCK=V?[540,720]:[960,430];
+const chips=[];{let i=0;ROWS.forEach((n,r)=>{for(let k=0;k<n;k++,i++){const [name,gb,kd]=CH[i];
+  const el=document.createElement('div');el.className='chip';el.innerHTML=`<div class="ci" style="background:${KC[kd]}">${FILEIC}</div><div><div class="cn">${name}</div><div class="cs">${fmt(gb)}</div></div>`;$('#chips').appendChild(el);
+  const x=CX-n*242/2+k*242+(R()-.5)*30,y=FLOOR-58-r*55+(R()-.5)*6,rot=(R()-.5)*12;
+  const td=i<3?3.12+i*.14:i<6?3.94+(i-3)*.13:i<9?4.62+(i-6)*.2:5.3+(i-9)*.115;
+  chips.push({el,gb,x,y,rot,td,x0:x+(R()-.5)*160,y0:-140-R()*160,r0:(R()-.5)*70});}});}
+const CHTOT=CH.reduce((a,c)=>a+c[1],0);
+
+// ---------- app window content
+const IC={
+ spark:'<path d="M8 1.5c.5 3 1.5 4 4.5 4.5-3 .5-4 1.5-4.5 4.5-.5-3-1.5-4-4.5-4.5 3-.5 4-1.5 4.5-4.5z"/><path d="M12.5 10.5c.2 1.2.6 1.6 1.8 1.8-1.2.2-1.6.6-1.8 1.8-.2-1.2-.6-1.6-1.8-1.8 1.2-.2 1.6-.6 1.8-1.8z"/>',
+ trash:'<path d="M2.5 4.5h11M6 4.5V2.5h4v2M4 4.5l.7 9h6.6l.7-9"/>',
+ chart:'<path d="M2.5 3.5h7M2.5 8h11M2.5 12.5h4.5"/>',
+ big:'<path d="M4 1.5h5l3 3v10H4z"/><path d="M8 12.5V7M6 9l2-2 2 2"/>',
+ clock:'<circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/>',
+ dup:'<rect x="2" y="4.5" width="8" height="10" rx="1.5"/><path d="M6 4.5V1.5h8v10h-4"/>',
+};
+const svg16=p=>`<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const SIDE=[['Cleanup','spark',112],['Uninstall Apps','trash',146],['Disk Usage','chart',212],['Large Files','big',246],['Stale Files','clock',280],['Duplicates','dup',314]];
+$('#rows').innerHTML=SIDE.map(([n,ic,y],i)=>`<div class="row" id="sr${i}" style="top:${y}px">${svg16(IC[ic])}<span>${n}</span><span class="meta tab" id="sm${i}"></span></div>`).join('');
+const CHECK='<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.2l2.3 2.3 4.7-5"/></svg>';
+const wic=(c,p)=>`<div class="ico" style="background:${c}1f;color:${c}">${svg16(p).replace('<svg','<svg width="20" height="20"')}</div>`;
+const CLEAN=[['Application Caches','Browsers, apps and system caches',8.2,'#2f80ed',IC.spark],['Developer Data','Xcode DerivedData, simulators, npm, Gradle',9.6,'#f2711c',IC.big],['Logs & Crash Reports','System and app logs, diagnostic reports',1.4,'#d4a20b',IC.clock],['Incomplete Downloads','.part, .crdownload and .download files',2.0,'#8b5cf6',IC.big],['Trash','Items already in your Trash',3.4,'#6b7280',IC.trash]];
+$('#cleanRows').innerHTML=CLEAN.map(([n,d,g,c,ic],i)=>`<div class="lrow" id="cr${i}" style="top:${146+i*(V?96:80)}px;height:${V?96:80}px"><div class="cb">${CHECK}</div>${wic(c,ic)}<div><div class="t1">${n}</div><div class="t2">${d}</div></div><div class="sz">${fmt(g)}</div></div>`).join('');
+const APPS=[['PixelForge',1.4,'#8b5cf6'],['Notely',.312,'#eab308'],['Bloatware Pro',2.1,'#ef4444'],['SoundBox',.845,'#ec4899'],['Trackr',.096,'#22c55e'],['Zipster',.054,'#3b82f6'],['Weatherly',.12,'#0ea5e9'],['CodeNest',.68,'#6366f1'],['Framewise',1.1,'#f97316']];
+$('#appRows').innerHTML=APPS.map(([n,g,c],i)=>`<div class="a" id="ar${i}" style="left:10px;right:10px;top:${12+i*60}px;height:56px;border-radius:8px;display:flex;align-items:center;gap:12px;padding:0 12px"><div class="appic" style="width:36px;height:36px;font-size:18px;background:linear-gradient(160deg,${c},${c}bb)">${n[0]}</div><div><div style="font-size:14px;font-weight:600">${n}</div><div class="arsub" style="font-size:12px;color:#8a8f94">${fmt(g)}</div></div></div>`).join('');
+$('#unHead').innerHTML=`<div class="appic" style="width:68px;height:68px;font-size:34px;background:linear-gradient(160deg,#ef4444,#ef4444bb)">B</div><div><div style="font-size:24px;font-weight:700;letter-spacing:-.01em">Bloatware Pro</div><div style="font-size:13px;color:#8a8f94;margin-top:3px">Version 4.2.1 · 6 items · 2.1 GB</div></div>`;
+const FOLD='<path d="M1.5 4.5v8h13v-7H8L6.5 3.5h-5z"/>',DOC='<path d="M4 1.5h5l3 3v10H4z"/>';
+const UNF=[['/Applications/Bloatware Pro.app',.512,DOC],['~/Library/Application Support/Bloatware Pro',1.1,FOLD],['~/Library/Caches/com.bloatware.pro',.386,FOLD],['~/Library/Logs/Bloatware Pro',.074,FOLD],['~/Library/Preferences/com.bloatware.pro.plist',.000012,DOC],['~/Library/Saved Application State/…pro.savedState',.002,FOLD]];
+$('#unFiles').innerHTML=UNF.map(([p,g,ic],i)=>`<div class="lrow" id="uf${i}" style="top:${152+i*50}px;height:50px;gap:12px"><div class="cb">${CHECK}</div><span style="color:#8a8f94">${svg16(ic).replace('<svg','<svg width="18" height="18"')}</span><div class="mono" style="font-size:12.5px;color:#1d1d1f">${p}</div><div class="sz" style="font-size:13px;font-weight:500;color:#6e7378">${g<.001?'12 KB':fmt(g)}</div></div>`).join('');
+const USE=[['Library',128],['Developer',94],['Movies',71],['Downloads',48],['Documents',37],['Pictures',22],['Music',12]];
+$('#useRows').innerHTML=USE.map(([n,g],i)=>`<div class="a" style="left:28px;right:28px;top:${84+i*74}px;height:60px">
+ <div style="display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600"><span style="color:${TEAL}">${svg16(FOLD).replace('<svg','<svg width="18" height="18"')}</span>${n}<span class="sz" id="us${i}">0 GB</span></div>
+ <div style="height:12px;border-radius:6px;background:rgba(0,0,0,.06);margin-top:10px;overflow:hidden"><div id="ub${i}" style="height:100%;border-radius:6px;background:linear-gradient(90deg,oklch(0.62 0.13 175),oklch(0.72 0.12 190));width:0"></div></div></div>`).join('');
+const badge=(ext,c)=>`<div style="width:38px;height:46px;border-radius:6px;background:${c};position:relative;flex:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:10px;font-weight:800;color:#fff;letter-spacing:.03em">${ext}</div>`;
+const LARGE=[['Final Cut Export.mov','~/Movies/Exports',8.4,'MOV','#8b5cf6'],['ubuntu-24.04-desktop.iso','~/Downloads',6.1,'ISO','#f97316'],['Xcode_16.xip','~/Downloads',3.2,'XIP','#3b82f6'],['VM Backup 2024.zip','~/Documents/Backups',2.7,'ZIP','#64748b'],['Sample Library.dmg','~/Downloads',1.9,'DMG','#0ea5e9'],['Podcast Raw.wav','~/Music/Recordings',1.2,'WAV','#ec4899']];
+$('#largeRows').innerHTML=LARGE.map(([n,p,g,e,c],i)=>`<div class="lrow" id="lr${i}" style="top:${60+i*76}px;height:76px">${badge(e,c)}<div><div class="t1">${n}</div><div class="t2 mono">${p}</div></div><div class="lbar" style="margin-left:auto;width:200px;height:8px;border-radius:4px;background:rgba(0,0,0,.06);overflow:hidden"><div style="height:100%;width:${g/8.4*100}%;background:${TEAL};border-radius:4px"></div></div><div class="sz" style="margin-left:18px;width:70px;text-align:right">${fmt(g)}</div></div>`).join('');
+const STALE=[['iPhone Backup 2020','~/Library/…/MobileSync','6 years ago',22.0,'#64748b'],['Wedding Video Raw','~/Movies','5 years ago',12.4,'#8b5cf6'],['Project Archive 2021','~/Documents/Archive','4 years ago',3.8,'#f97316'],['Thesis Draft (old).docx','~/Documents','3 years ago',.048,'#3b82f6'],['Unity Project (backup)','~/Developer/Backups','2 years ago',5.1,'#22c55e'],['Old Screenshots','~/Desktop/Screenshots','2 years ago',1.6,'#0ea5e9']];
+$('#staleRows').innerHTML=STALE.map(([n,p,a,g,c],i)=>`<div class="lrow" id="st${i}" style="top:${60+i*76}px;height:76px"><div class="ico" style="background:${c}1f;color:${c}">${svg16(FOLD).replace('<svg','<svg width="20" height="20"')}</div><div><div class="t1">${n}</div><div class="t2 mono">${p}</div></div><div style="margin-left:auto;display:flex;align-items:center;gap:7px;font-size:13px;color:#b45309;background:#fef3c7;padding:5px 11px;border-radius:999px">${svg16(IC.clock).replace('<svg','<svg width="14" height="14"')}${a}</div><div class="sz" style="margin-left:22px;width:76px;text-align:right">${fmt(g)}</div></div>`).join('');
+const DUP=[['installer-v2.dmg','3 copies · 1.5 GB each',3.0,3,'#0ea5e9'],['Holiday Photos.zip','2 copies · 1.4 GB each',1.4,2,'#f97316'],['Presentation Final.key','2 copies · 1.2 GB each',1.2,2,'#3b82f6'],['Lecture Recording.m4a','2 copies · 210 MB each',.21,2,'#ec4899']];
+$('#dupRows').innerHTML=DUP.map(([n,d,g,k,c],i)=>`<div class="lrow" id="dr${i}" style="top:${150+i*104}px;height:104px"><div style="width:70px;height:60px;position:relative;flex:none">${[...Array(k)].map((_,j)=>`<div class="dcp" style="position:absolute;left:14px;top:4px;width:40px;height:50px;border-radius:7px;background:${c};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.18);opacity:${1-j*.18}"></div>`).join('')}</div><div><div class="t1">${n}</div><div class="t2">${d}</div></div><div style="margin-left:auto;text-align:right"><div class="sz" style="color:${TEAL}">${fmt(g)}</div><div class="t2">wasted</div></div></div>`).join('');
+const PATHS=['~/Library/Caches/com.apple.Safari','~/Library/Caches/Google/Chrome/Default','~/Library/Logs/DiagnosticReports','~/Library/Developer/Xcode/DerivedData','~/Library/Developer/CoreSimulator/Caches','~/.npm/_cacache','~/.gradle/caches/modules-2','~/Downloads/movie.mp4.part','~/Library/Caches/com.spotify.client','~/.cache/pip/http','~/Library/Developer/Xcode/iOS DeviceSupport','~/.Trash'];
+$('#pills').innerHTML=['Free','Open Source','Made for Mac'].map(s=>`<span class="pill"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>${s}</span>`).join('');
+const pills=[...document.querySelectorAll('.pill')];
+
+// ---------- particles
+const cv=$('#cv');cv.width=W;cv.height=H;const ctx=cv.getContext('2d');
+const PS=[...Array(V?110:90)].map(()=>({x:R()*W,y:R()*(H+100),v:6+R()*26,s:.6+R()*2.2,a:.12+R()*.45,ph:R()*6.28,dx:(R()-.5)*8}));
+const SP=[...Array(56)].map(()=>({a:R()*6.283,v:300+R()*700,s:1.5+R()*3}));
+function sparks(t,t0,cx,cy){const s=t-t0;if(s<0||s>1.4)return;const p=E.out(clamp(s/1.4));
+  for(const k of SP){const r=k.v*p;ctx.fillStyle=`rgba(180,255,240,${(1-p)*.9})`;ctx.beginPath();ctx.arc(cx+Math.cos(k.a)*r,cy+Math.sin(k.a)*r,k.s*(1-p*.5),0,7);ctx.fill();}}
+function particles(t){ctx.clearRect(0,0,W,H);
+  for(const p of PS){const y=((p.y-p.v*t)%(H+100)+(H+100))%(H+100)-50;let x=p.x+Math.sin(t*.5+p.ph)*20+p.dx*t;x=((x%W)+W)%W;
+    ctx.fillStyle=`rgba(94,234,212,${p.a*(.55+.45*Math.sin(t*2+p.ph))})`;ctx.beginPath();ctx.arc(x,y,p.s,0,7);ctx.fill();}
+  sparks(t,8.45,SUCK[0],SUCK[1]);sparks(t,34.05,V?540:960,V?640:290);}
+
+// ---------- scenes
+function bg(t){
+  S('#glowT',{transform:`translate(${Math.sin(t*.3)*140}px,${Math.cos(t*.23)*70}px) scale(${1+.08*Math.sin(t*.5)})`,opacity:.55+.3*P(t,2.6,4)+.4*bump(t,8.6,.9)+.3*bump(t,34.2,.9)});
+  const fill=P(t,.2,2.1,E.io);
+  S('#glowR',{opacity:.9*fill*fill*(1-P(t,2.5,3.4,E.lin))});
+  S('#grid',{transform:`translateY(${(-t*14)%44}px)`,opacity:.5+.3*P(t,12.8,13.6)*(1-P(t,33.6,34.2))});
+  particles(t);
+}
+function s1(t){
+  const on=t<3.2;show('#s1',on);if(!on)return;
+  const fill=P(t,.2,2.1,E.io)*.97;
+  const pin=P(t,0,.7,E.out),out=P(t,2.55,3.05,E.in);
+  const shake=Math.sin(t*95)*7*bump(t,2.25,.25);
+  const tf=`translate(${shake}px,${-out*40}px) scale(${(.82+.18*pin)*(1-.25*out)})`;
+  S('#ring',{transform:tf,opacity:pin*(1-out)});S('#ringC',{transform:tf,opacity:pin*(1-out)});
+  const h=fill<.55?172:lerp(172,4,clamp((fill-.55)/.42));
+  const col=`hsl(${h},85%,${h>100?62:60}%)`;
+  S('#arc',{strokeDashoffset:1193.8*(1-fill),stroke:col,filter:`drop-shadow(0 0 ${10+20*fill}px ${col})`});
+  $('#pct').textContent=Math.round(fill*100)+'%';
+  $('#avail').textContent=(512*(1-fill)).toFixed(1)+' GB available';
+  S('#avail',{color:fill>.9?'#ff8a80':'rgba(255,255,255,.5)'});
+  const ni=P(t,1.3,1.8,E.back),no=P(t,2.6,3.0,E.in);
+  S('#notif',{transform:`translateX(${(1-ni)*520+no*520}px)`,opacity:Math.min(1,ni*2)});
+  animLine(L1,t,.92,3.05,.2,.55,.35);
+}
+function s2(t){
+  const on=t>2.85&&t<8.7;show('#s2',on);if(!on)return;
+  let landed=0;
+  chips.forEach((c,i)=>{
+    const s=t-c.td;if(s<0){c.el.style.opacity=0;return}
+    const fall=.42;let y,x,r;
+    if(s<fall){const p=s/fall;y=lerp(c.y0,c.y,p*p);x=lerp(c.x0,c.x,E.out(p));r=lerp(c.r0,c.rot,E.out(p));}
+    else{const u=s-fall;y=c.y-30*Math.abs(Math.sin(u*13))*Math.exp(-u*9);x=c.x;r=c.rot+c.r0*.06*Math.sin(u*13)*Math.exp(-u*9);}
+    landed+=c.gb*P(t,c.td+fall,c.td+fall+.25,E.lin);
+    const sp=P(t,7.95+i*.01,8.42+i*.01,E.in);
+    const tx=lerp(x,SUCK[0]-118,sp),ty=lerp(y,SUCK[1]-29,sp);
+    c.el.style.transform=`translate(${tx}px,${ty}px) rotate(${r+sp*260}deg) scale(${1-.92*sp})`;
+    c.el.style.opacity=1-P(sp,.75,1,E.lin);
+  });
+  const g=24.6*landed/CHTOT;
+  $('#cnt').textContent=g.toFixed(1)+' GB';
+  const ci=P(t,3.15,3.7),co=P(t,7.7,8.1,E.in);
+  S('#cntBox',{opacity:ci*(1-co),transform:`translateY(${(1-ci)*30-co*20}px)`});
+  L2.forEach((L,i)=>{animLine(L,t,L._t0,6.05,.08,.6,.3);const nxt=L2[i+1];L.style.opacity=nxt?1-.62*P(t,nxt._t0,nxt._t0+.3):1;});
+  L2b.forEach(L=>animLine(L,t,L._t0,8.15,.08,.6,.3));
+}
+function s3(t){
+  const on=t>8.2&&t<13.4;show('#s3',on);if(!on)return;
+  const out=P(t,12.55,13.05,E.in);
+  S('#s3',{opacity:1-out,transform:`scale(${1+.06*out})`,filter:`blur(${out*8}px)`});
+  S('#flash',{opacity:.85*bump(t,8.5,.35)});
+  [['#sw1',8.45],['#sw2',8.62]].forEach(([id,t0])=>{const p=P(t,t0,t0+1.1,E.out),d=10+p*1400;S(id,{width:d+'px',height:d+'px',marginLeft:-d/2+'px',marginTop:-d/2+'px',opacity:(t>t0?1:0)*(1-p)});});
+  const lp=P(t,8.42,9.05,E.back),fl=Math.sin((t-9)*1.6)*6;
+  S('#logo3',{transform:`translateY(${fl*P(t,9,9.6)}px) scale(${lp}) rotate(${(1-P(t,8.42,9.05))*-30}deg)`,opacity:P(t,8.42,8.6,E.lin),filter:`drop-shadow(0 0 ${40+12*Math.sin(t*2)}px rgba(94,234,212,.55))`});
+  animWords($('#wm3')._w,t,8.66,null,.04,.6);
+  const a=P(t,9.72,10.3),b=P(t,11.22,11.8);
+  S('#tagA',{opacity:a,display:'inline-block',transform:`translateY(${(1-a)*24}px)`});
+  S('#tagB',{opacity:b,display:'inline-block',transform:`translateY(${(1-b)*24}px)`,textShadow:`0 0 ${30*b}px rgba(94,234,212,.5)`});
+}
+const VOL=t=>{let free=15.4;free+=24.6*P(t,17.55,18.2,E.io);free+=2.1*P(t,22.45,22.95,E.io);return free;};
+function selY(t){let y=112;y=lerp(y,146,P(t,18.55,18.75));y=lerp(y,212,P(t,23.55,23.8));y=lerp(y,246,P(t,26.1,26.3));y=lerp(y,280,P(t,27.3,27.5));y=lerp(y,314,P(t,28.3,28.5));return y;}
+function pane(id,t,a,b){const vis=t>a-.01&&t<b+.01;show(id,vis);if(!vis)return 0;const i=P(t,a,a+.3),o=b>=99?0:P(t,b-.2,b,E.in);S(id,{opacity:i*(1-o),transform:`translateY(${(1-i)*14}px)`});return 1;}
+function app(t){
+  const on=t>12.8&&t<34.3;show('#sApp',on);S('#vign',{opacity:1-.55*P(t,12.8,13.6)*(1-P(t,33.6,34.2))});if(!on)return;
+  KICK.forEach(L=>animLine(L,t,L._a,L._b,.03,.5,.3));
+  HEAD.forEach(L=>animLine(L,t,L._a,L._b,.07,.6,.3));
+  // window transform
+  const wi=P(t,12.85,13.75,E.out),wo=P(t,33.55,34.2,E.in),z=P(t,29.45,30.6,E.io);
+  S('#win',{transform:`translateY(${(1-wi)*520+wo*700}px) rotateX(${(1-wi)*28-wo*12}deg) scale(${(.88+.12*wi)*(1-.03*z)})`,opacity:Math.min(1,wi*1.6)*(1-P(t,33.8,34.2,E.lin))});
+  // sidebar
+  const sy=selY(t);$('#sel').style.top=sy+'px';
+  SIDE.forEach(([, , y],i)=>{const on=Math.abs(y-sy)<10;const r=$('#sr'+i);r.style.color=on?'#fff':'#1d1d1f';const sweep=bump(t,29.6+i*.12,.25)*(i>1?1:0);r.style.background=sweep?`rgba(20,184,166,${.18*sweep})`:'transparent';});
+  const meta=[t>15.8&&t<17.5?'24.6 GB':'',t>18.9?(t>22.6?'8':'9'):'',t>24.4?'412 GB':'',t>26.4?'6':'',t>27.6?'6':'',t>28.6?'5.8 GB':''];
+  meta.forEach((m,i)=>{$('#sm'+i).textContent=m;});
+  const free=VOL(t),used=512-free;
+  $('#volFree').textContent=free.toFixed(1)+' GB free';$('#volUsed').textContent=used.toFixed(1)+' GB of 512 GB used';
+  S('#volBar',{width:(used/512*100)+'%',background:used/512>.95?'#ff453a':'oklch(0.62 0.13 175)'});
+  $('#trashSz').textContent=t>17.6?'Empty':'3.4 GB';
+  // --- cleanup pane
+  if(pane('#pClean',t,12.85,18.62)){
+    const sc=P(t,13.4,15.0,E.io);
+    show('#scanBox',t<15.25);S('#scanBox',{opacity:1-P(t,15.0,15.2,E.lin)});
+    $('#scanPct').textContent=Math.round(sc*100)+'%';$('#scanBar').style.width=sc*100+'%';
+    $('#scanPath').textContent=PATHS[Math.min(PATHS.length-1,Math.floor(sc*PATHS.length*.999))];
+    const rs=t>15.05;show('#resBox',rs&&t<18);
+    if(rs){$('#junkNum').textContent=(24.6*P(t,15.1,15.9,E.out)*(1-P(t,17.45,17.9,E.io))).toFixed(1)+' GB';
+      CLEAN.forEach((_,i)=>{const a=P(t,15.15+i*.1,15.6+i*.1),o=P(t,17.42+i*.05,17.75+i*.05,E.in);S('#cr'+i,{opacity:a*(1-o),transform:`translateX(${(1-a)*40-o*80}px)`});});
+      const fi=P(t,15.6,15.9);S('#cleanFoot',{opacity:fi*(1-P(t,17.5,17.75)),transform:`translateY(${(1-fi)*20}px)`});
+      S('#btnClean',{transform:`scale(${1-.07*bump(t,17.38,.12)})`,filter:`brightness(${1-.12*bump(t,17.38,.15)+.08*P(t,17.0,17.2)})`});
+      S('#resBox',{opacity:1-P(t,17.75,17.95,E.lin)});}
+    const dn=P(t,17.85,18.15);show('#doneBox',t>17.8);
+    S('#doneBox',{opacity:dn,transform:`scale(${.9+.1*E.back(clamp((t-17.85)/.4))})`});
+    $('#doneC').style.strokeDashoffset=364.4*(1-P(t,17.85,18.3,E.io));$('#doneK').style.strokeDashoffset=80*(1-P(t,18.1,18.4));
+    $('#freedNum').textContent=(24.6*P(t,17.85,18.35)).toFixed(1)+' GB';
+  }
+  // --- uninstall pane
+  if(pane('#pUn',t,18.65,23.6)){
+    APPS.forEach((_,i)=>{const a=P(t,18.75+i*.04,19.15+i*.04),sel=i===2;const gone=sel?P(t,22.45,22.8,E.in):0;const up=i>2?P(t,22.7,23.0,E.io)*60:0;
+      S('#ar'+i,{opacity:a*(1-gone),transform:`translateX(${(1-a)*-30-gone*60}px) translateY(${-up}px)`,background:sel&&t>19.58?`rgba(20,184,166,${.14*P(t,19.58,19.7)})`:'transparent'});});
+    const hd=P(t,19.65,20.0);S('#unHead',{opacity:hd*(1-P(t,22.5,22.8)),transform:`translateY(${(1-hd)*16}px)`});
+    S('#unLbl',{opacity:P(t,20.5,20.8)*(1-P(t,22.5,22.8))});
+    const ft=[20.75,21.3,21.48,21.66,21.84,22.02];
+    UNF.forEach((_,i)=>{const a=P(t,ft[i],ft[i]+.35),o=P(t,22.38+i*.04,22.7+i*.04,E.in);S('#uf'+i,{opacity:a*(1-o),transform:`translateY(${(1-a)*14}px) translateX(${o*120}px)`});});
+    const ff=P(t,21.0,21.3);S('#unFoot',{opacity:ff*(1-P(t,22.5,22.8))});
+    S('#btnUn',{transform:`scale(${1-.07*bump(t,22.3,.12)})`,filter:`brightness(${1-.12*bump(t,22.3,.15)+.08*P(t,21.95,22.15)})`});
+    const ts=P(t,22.6,22.9,E.back),to=P(t,23.25,23.5);S('#toast',{opacity:Math.min(1,ts)*(1-to),transform:`translateX(-50%) translateY(${(1-ts)*30}px)`});
+  }
+  // --- usage pane
+  if(pane('#pUse',t,23.6,26.15)){
+    USE.forEach(([,g],i)=>{const p=P(t,23.8+i*.12,24.8+i*.12,E.out);$('#ub'+i).style.width=(g/128*100*p)+'%';$('#us'+i).textContent=Math.round(g*p)+' GB';});
+  }
+  if(pane('#pLarge',t,26.15,27.35)){LARGE.forEach((_,i)=>{const a=P(t,26.2+i*.07,26.6+i*.07);S('#lr'+i,{opacity:a,transform:`translateX(${(1-a)*50}px)`});});}
+  if(pane('#pStale',t,27.35,28.35)){STALE.forEach((_,i)=>{const a=P(t,27.4+i*.07,27.8+i*.07);S('#st'+i,{opacity:a,transform:`translateX(${(1-a)*50}px)`});});}
+  if(pane('#pDup',t,28.35,99)){
+    $('#dupNum').textContent=(5.8*P(t,28.4,29.2)).toFixed(1)+' GB';
+    DUP.forEach((d,i)=>{const a=P(t,28.45+i*.1,28.9+i*.1);const r=$('#dr'+i);S(r,{opacity:a,transform:`translateX(${(1-a)*50}px)`});
+      const f=P(t,28.7+i*.1,29.3+i*.1,E.back);[...r.querySelectorAll('.dcp')].forEach((el,j)=>{el.style.transform=`translateX(${j*9*f}px) rotate(${(j-(d[3]-1)/2)*10*f}deg)`;});});
+  }
+  // --- confirm sheet
+  const sh=P(t,31.15,31.6,E.back),so=P(t,33.2,33.45,E.in);
+  show('#dim',t>31);show('#sheet',t>31.1);
+  S('#dim',{opacity:P(t,31.0,31.3)*(1-so)});
+  S('#sheet',{opacity:Math.min(1,P(t,31.15,31.35,E.lin))*(1-so),transform:`translateY(${(1-sh)*-40}px) scale(${(.9+.1*sh)*(1-.05*so)})`});
+  S('#btnTrash',{transform:`scale(${1-.06*bump(t,33.1,.12)})`,boxShadow:`0 0 0 ${4*P(t,32.3,32.6)}px rgba(20,184,166,.25)`});
+}
+function s8(t){
+  const on=t>33.8;show('#s8',on);if(!on)return;
+  const lp=P(t,33.95,34.55,E.back);
+  S('#logo8',{transform:`translateY(${Math.sin((t-34)*1.6)*5}px) scale(${lp})`,opacity:P(t,33.95,34.1,E.lin),filter:`drop-shadow(0 0 ${36+10*Math.sin(t*2)}px rgba(94,234,212,.5))`});
+  animWords($('#wm8')._w,t,34.2,null,.04,.6);
+  [35.25,35.92,36.95].forEach((t0,i)=>{const p=P(t,t0,t0+.45,E.back);pills[i].style.transform=`translateY(${(1-p)*30}px) scale(${.8+.2*p})`;pills[i].style.opacity=clamp(p*1.5);});
+  const f=P(t,37.3,37.9);S('#foot8',{opacity:f,transform:`translateY(${(1-f)*14}px)`});
+}
+// cursor keyframes [time,x,y]
+let CK=[];
+const CLICKS=[17.38,18.55,19.6,22.3,33.1];
+function cursor(t){
+  if(!CK.length)return;
+  const vis=(t>16.2&&t<23.3)||(t>31.5&&t<34.0);show('#cursor',vis);show('#ripple',vis);if(!vis)return;
+  let x=CK[0][1],y=CK[0][2];
+  for(let i=0;i<CK.length-1;i++){const [a,x0,y0]=CK[i],[b,x1,y1]=CK[i+1];if(t>=a&&t<=b){const p=E.io((t-a)/(b-a));x=lerp(x0,x1,p);y=lerp(y0,y1,p);break;}if(t>b){x=x1;y=y1;}}
+  const op=Math.min(P(t,16.2,16.45,E.lin),1-P(t,22.95,23.3,E.lin))+(t>31?Math.min(P(t,31.5,31.75,E.lin),1-P(t,33.7,34.0,E.lin)):0);
+  let cs=1;CLICKS.forEach(c=>cs-=.16*bump(t,c,.1));
+  S('#cursor',{left:(x-2)+'px',top:(y-2)+'px',opacity:clamp(op),transform:`scale(${cs})`,transformOrigin:'2px 2px'});
+  let rp=null;CLICKS.forEach(c=>{if(t>=c&&t<c+.45)rp=c;});
+  if(rp!=null){const p=E.out((t-rp)/.45),d=10+p*70;S('#ripple',{left:(x-d/2)+'px',top:(y-d/2)+'px',width:d+'px',height:d+'px',opacity:(1-p)*.9});}else S('#ripple',{opacity:0});
+}
+function render(t){
+  S('#fade',{opacity:Math.max(1-P(t,0,.4,E.lin),P(t,39.2,40,E.lin))});
+  bg(t);s1(t);s2(t);s3(t);app(t);s8(t);cursor(t);
+}
+window.render=render;
+function buildCK(){
+  const m=(t,sel,fx,dy=0)=>{render(t);const r=$(sel).getBoundingClientRect();return [t,Math.round(r.x+(fx==null?r.width/2:fx)),Math.round(r.y+r.height/2+dy)];};
+  const off=(t,h,v)=>[t,...(V?v:h)],hold=(t,p)=>[t,p[1],p[2]];
+  const c=m(17.2,'#btnClean',null,-3),s=m(18.45,'#sr1',V?120:124,2),a=m(19.45,'#ar2',V?150:170,3),u=m(22.15,'#btnUn',null,-3),tr=m(32.7,'#btnTrash',null,1);
+  return [off(16.2,[1320,900],[760,1330]),off(16.45,[1320,900],[760,1330]),c,hold(17.9,c),s,hold(18.9,s),a,hold(21.35,a),u,hold(22.7,u),
+    off(23.3,[1760,1075],[1000,1650]),off(31.5,[1260,930],[760,1380]),off(32.0,[1260,930],[760,1380]),tr,hold(33.4,tr),off(34.0,[1300,1000],[820,1500])];
+}
+CK=buildCK();
+const q=new URLSearchParams(location.search);render(parseFloat(q.get('t')||'0'));
+window.ready=true;
+</script>
+</body></html>
