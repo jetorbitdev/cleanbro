@@ -3,9 +3,12 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-swift build -c release
-BIN="$(swift build -c release --show-bin-path)/CleanBro"
+# Universal binary: jalan di Apple Silicon dan Intel
+ARCHS=(--arch arm64 --arch x86_64)
+swift build -c release $ARCHS
+BIN="$(swift build -c release $ARCHS --show-bin-path)/CleanBro"
 APP="build/CleanBro.app"
+ZIP="build/CleanBro.zip"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -33,4 +36,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 codesign --force --sign - "$APP" >/dev/null
+
+# Zip untuk dibagikan; ditto menjaga permission & signature bundle
+rm -f "$ZIP"
+ditto -c -k --keepParent "$APP" "$ZIP"
+
 echo "✅ $PWD/$APP"
+echo "📦 $PWD/$ZIP"
