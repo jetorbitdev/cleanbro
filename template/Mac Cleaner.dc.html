@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}a{color:oklch(0.55 0.13 175)}a:hover{color:oklch(0.45 0.13 175)}*{box-sizing:border-box}</style></helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px;background:linear-gradient(160deg,#d9dfe3,#c4cdd3)">
+  <div style="width:1080px;max-width:100%;height:680px;display:flex;border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 0 0 0.5px rgba(0,0,0,.25),0 24px 60px rgba(0,0,0,.25)">
+    <aside style="width:220px;flex:none;display:flex;flex-direction:column;background:#eef0f1;border-right:1px solid rgba(0,0,0,.08)">
+      <div style="height:52px;display:flex;align-items:center;gap:8px;padding:0 18px">
+        <span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span>
+      </div>
+      <div style="padding:4px 18px 14px;font-size:15px;font-weight:600;color:#1d1d1f;letter-spacing:-.01em">Rapi</div>
+      <div style="padding:0 10px;display:flex;flex-direction:column;gap:2px">
+        <div style="padding:6px 8px 4px;font-size:11px;font-weight:600;color:#8a8f94">Alat</div>
+        <sc-for list="{{ nav }}" as="item" hint-placeholder-count="2">
+          <div onClick="{{ item.go }}" style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:6px;font-size:13px;cursor:pointer;background:{{ item.bg }};color:{{ item.color }}">
+            <span>{{ item.label }}</span><span style="font-size:11px;opacity:.75">{{ item.meta }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:auto;padding:16px 18px 20px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#1d1d1f"><span style="font-weight:500">Macintosh HD</span><span style="color:#6e7378">{{ diskFree }} kosong</span></div>
+        <div style="height:6px;border-radius:3px;background:rgba(0,0,0,.08);overflow:hidden"><div style="height:100%;border-radius:3px;background:oklch(0.62 0.13 175);width:{{ diskPct }}"></div></div>
+        <div style="font-size:11px;color:#8a8f94">{{ diskUsed }} dari 512 GB terpakai</div>
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column;background:#fff">
+      <sc-if value="{{ isClean }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="height:52px;flex:none;display:flex;align-items:center;padding:0 28px;border-bottom:1px solid rgba(0,0,0,.06)">
+            <span style="font-size:13px;font-weight:600;color:#1d1d1f">Pembersihan</span>
+          </div>
+          <sc-if value="{{ cleanIdle }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px;text-align:center">
+              <div style="width:148px;height:148px;border-radius:50%;border:10px solid oklch(0.94 0.03 175);display:flex;align-items:center;justify-content:center;font-size:13px;color:#6e7378">Siap</div>
+              <div style="font-size:24px;font-weight:600;color:#1d1d1f;letter-spacing:-.02em">Temukan file sampah di Mac Anda</div>
+              <div style="font-size:14px;color:#6e7378;max-width:420px;line-height:1.5;text-wrap:pretty">Cache, log, sisa unduhan, dan isi Sampah akan dipindai. Tidak ada yang dihapus sebelum Anda konfirmasi.</div>
+              <button onClick="{{ startScan }}" style="margin-top:6px;border:0;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:600;color:#fff;background:oklch(0.55 0.13 175);cursor:pointer" style-hover="background:oklch(0.5 0.13 175)">Pindai</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ cleanScanning }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center">
+              <div style="font-size:48px;font-weight:300;color:#1d1d1f;font-variant-numeric:tabular-nums;letter-spacing:-.03em">{{ scanPctLabel }}</div>
+              <div style="width:360px;max-width:100%;height:6px;border-radius:3px;background:rgba(0,0,0,.07);overflow:hidden"><div style="height:100%;background:oklch(0.55 0.13 175);width:{{ scanPctLabel }}"></div></div>
+              <div style="font-size:12px;color:#8a8f94;font-family:ui-monospace,Menlo,monospace;max-width:460px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ scanPath }}</div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ cleanDone }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+              <div style="padding:28px 28px 16px;display:flex;align-items:baseline;gap:10px">
+                <span style="font-size:32px;font-weight:600;color:#1d1d1f;letter-spacing:-.02em">{{ junkSelectedLabel }}</span>
+                <span style="font-size:14px;color:#6e7378">bisa dibersihkan</span>
+              </div>
+              <div style="flex:1;overflow:auto;padding:0 28px">
+                <sc-for list="{{ junk }}" as="j" hint-placeholder-count="4">
+                  <label style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer">
+                    <input type="checkbox" checked="{{ j.checked }}" onChange="{{ j.toggle }}" style="width:16px;height:16px;accent-color:oklch(0.55 0.13 175)">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                      <span style="font-size:14px;font-weight:500;color:#1d1d1f">{{ j.name }}</span>
+                      <span style="font-size:12px;color:#8a8f94">{{ j.desc }}</span>
+                    </div>
+                    <span style="font-size:13px;color:#1d1d1f;font-variant-numeric:tabular-nums">{{ j.sizeLabel }}</span>
+                  </label>
+                </sc-for>
+              </div>
+              <div style="flex:none;display:flex;justify-content:flex-end;gap:10px;padding:14px 28px;border-top:1px solid rgba(0,0,0,.06);background:#fafafa">
+                <button onClick="{{ resetScan }}" style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:7px 16px;font-size:13px;background:#fff;color:#1d1d1f;cursor:pointer">Pindai Ulang</button>
+                <button onClick="{{ doClean }}" style="border:0;border-radius:7px;padding:7px 18px;font-size:13px;font-weight:600;color:#fff;background:oklch(0.55 0.13 175);cursor:pointer">Bersihkan {{ junkSelectedLabel }}</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ cleanFinished }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;text-align:center">
+              <div style="font-size:13px;font-weight:600;color:oklch(0.5 0.13 175)">Selesai</div>
+              <div style="font-size:28px;font-weight:600;color:#1d1d1f;letter-spacing:-.02em">{{ freedLabel }} dikosongkan</div>
+              <div style="font-size:14px;color:#6e7378">File dipindahkan ke Sampah dan sudah dikosongkan.</div>
+              <button onClick="{{ resetScan }}" style="margin-top:10px;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:7px 16px;font-size:13px;background:#fff;color:#1d1d1f;cursor:pointer">Kembali</button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isLarge }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;min-height:0">
+          <div style="height:52px;flex:none;display:flex;align-items:center;gap:12px;padding:0 20px 0 28px;border-bottom:1px solid rgba(0,0,0,.06)">
+            <span style="font-size:13px;font-weight:600;color:#1d1d1f">File Besar</span>
+            <span style="font-size:12px;color:#8a8f94">{{ visibleCount }} file · {{ visibleTotal }}</span>
+            <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:#6e7378">Minimal</span>
+              <div style="display:flex;padding:2px;border-radius:7px;background:rgba(0,0,0,.06);gap:2px">
+                <sc-for list="{{ minOpts }}" as="m" hint-placeholder-count="3">
+                  <button onClick="{{ m.pick }}" style="border:0;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer;background:{{ m.bg }};color:#1d1d1f;box-shadow:{{ m.shadow }}">{{ m.label }}</button>
+                </sc-for>
+              </div>
+              <input value="{{ query }}" onInput="{{ onQuery }}" placeholder="Cari nama file" style="width:170px;border:1px solid rgba(0,0,0,.1);border-radius:7px;padding:6px 10px;font-size:12px;outline:none;background:#fafafa" style-focus="border-color:oklch(0.55 0.13 175);background:#fff">
+            </div>
+          </div>
+          <div style="flex:none;display:flex;gap:6px;padding:12px 28px">
+            <sc-for list="{{ types }}" as="t" hint-placeholder-count="5">
+              <button onClick="{{ t.pick }}" style="border:1px solid {{ t.border }};border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;background:{{ t.bg }};color:{{ t.color }}">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="flex:none;display:grid;grid-template-columns:28px minmax(0,1fr) 120px 96px;gap:12px;padding:6px 28px;font-size:11px;font-weight:600;color:#8a8f94;border-bottom:1px solid rgba(0,0,0,.06)">
+            <span></span><span>Nama</span><span>Diubah</span><span style="text-align:right">Ukuran</span>
+          </div>
+          <div style="flex:1;overflow:auto">
+            <sc-for list="{{ files }}" as="f" hint-placeholder-count="8">
+              <label style="display:grid;grid-template-columns:28px minmax(0,1fr) 120px 96px;gap:12px;align-items:center;padding:9px 28px;cursor:pointer;background:{{ f.bg }}" style-hover="background:#f5f7f7">
+                <input type="checkbox" checked="{{ f.checked }}" onChange="{{ f.toggle }}" style="width:15px;height:15px;accent-color:oklch(0.55 0.13 175)">
+                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                  <span style="flex:none;width:38px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.04em;background:{{ f.badgeBg }};color:{{ f.badgeFg }}">{{ f.ext }}</span>
+                  <div style="min-width:0;display:flex;flex-direction:column;gap:1px">
+                    <span style="font-size:13px;color:#1d1d1f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.name }}</span>
+                    <span style="font-size:11px;color:#8a8f94;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ f.path }}</span>
+                  </div>
+                </div>
+                <span style="font-size:12px;color:#6e7378">{{ f.modified }}</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                  <span style="font-size:13px;color:#1d1d1f;font-variant-numeric:tabular-nums">{{ f.sizeLabel }}</span>
+                  <div style="width:64px;height:3px;border-radius:2px;background:rgba(0,0,0,.06)"><div style="height:100%;border-radius:2px;background:oklch(0.62 0.13 175);width:{{ f.bar }}"></div></div>
+                </div>
+              </label>
+            </sc-for>
+            <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:60px 28px;text-align:center;font-size:13px;color:#8a8f94">Tidak ada file yang cocok dengan filter ini.</div>
+            </sc-if>
+          </div>
+          <div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px 28px;border-top:1px solid rgba(0,0,0,.06);background:#fafafa">
+            <span style="font-size:13px;color:#1d1d1f">{{ selCount }} dipilih</span>
+            <span style="font-size:13px;color:#6e7378">{{ selTotal }}</span>
+            <div style="margin-left:auto;display:flex;gap:10px">
+              <button onClick="{{ reveal }}" style="border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:7px 16px;font-size:13px;background:#fff;color:#1d1d1f;cursor:pointer">Tampilkan di Finder</button>
+              <button onClick="{{ trash }}" disabled="{{ noSel }}" style="border:0;border-radius:7px;padding:7px 18px;font-size:13px;font-weight:600;color:#fff;background:{{ trashBg }};cursor:pointer">Pindahkan ke Sampah</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:8px;background:rgba(29,29,31,.92);color:#fff;font-size:13px">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Pembersihan&quot;,&quot;File Besar&quot;],&quot;default&quot;:&quot;Pembersihan&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;fastScan&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;confirmDelete&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const GB = 1024;
+const FILES = [
+  { id: 1, name: 'Rekaman Presentasi Q3.mov', path: '~/Movies', ext: 'MOV', type: 'video', mb: 8420, modified: '14 Mar 2025' },
+  { id: 2, name: 'Xcode_15.4.xip', path: '~/Downloads', ext: 'XIP', type: 'archive', mb: 7310, modified: '2 Jun 2025' },
+  { id: 3, name: 'Windows 11 ARM.vmdk', path: '~/Parallels/Windows 11.pvm', ext: 'VMDK', type: 'disk', mb: 6200, modified: '28 Okt 2026' },
+  { id: 4, name: 'Backup Foto 2023.zip', path: '~/Documents/Arsip', ext: 'ZIP', type: 'archive', mb: 4870, modified: '9 Jan 2024' },
+  { id: 5, name: 'Final Cut Render Files', path: '~/Movies/Final Cut Backups.localized', ext: 'DIR', type: 'other', mb: 3940, modified: '20 Sep 2026' },
+  { id: 6, name: 'macOS Sequoia Installer.dmg', path: '~/Downloads', ext: 'DMG', type: 'disk', mb: 2950, modified: '11 Nov 2024' },
+  { id: 7, name: 'Wedding Raw Footage.mp4', path: '~/Desktop/Klien', ext: 'MP4', type: 'video', mb: 2410, modified: '3 Agu 2026' },
+  { id: 8, name: 'node_modules', path: '~/Projects/old-dashboard', ext: 'DIR', type: 'other', mb: 1320, modified: '17 Feb 2025' },
+  { id: 9, name: 'Figma Export Assets.zip', path: '~/Downloads', ext: 'ZIP', type: 'archive', mb: 860, modified: '30 Okt 2026' },
+  { id: 10, name: 'Podcast Ep 12 Master.wav', path: '~/Music/Podcast', ext: 'WAV', type: 'other', mb: 640, modified: '5 Mei 2026' },
+  { id: 11, name: 'Screen Recording 2026-10-01.mov', path: '~/Desktop', ext: 'MOV', type: 'video', mb: 420, modified: '1 Okt 2026' },
+  { id: 12, name: 'Docker.raw', path: '~/Library/Containers/com.docker.docker', ext: 'RAW', type: 'disk', mb: 310, modified: '1 Nov 2026' },
+  { id: 13, name: 'Zoom_Installer.pkg', path: '~/Downloads', ext: 'PKG', type: 'archive', mb: 160, modified: '22 Jul 2025' },
+];
+const JUNK = [
+  { id: 'cache', name: 'Cache aplikasi', desc: 'Safari, Chrome, Spotify, Slack, dan 24 lainnya', mb: 2140 },
+  { id: 'logs', name: 'Log sistem', desc: 'Laporan crash dan log diagnostik lama', mb: 380 },
+  { id: 'xcode', name: 'Data turunan Xcode', desc: 'DerivedData dan simulator yang tidak dipakai', mb: 1260 },
+  { id: 'dl', name: 'Unduhan tidak lengkap', desc: 'File .crdownload dan .part', mb: 190 },
+  { id: 'trash', name: 'Isi Sampah', desc: '312 item', mb: 840 },
+];
+const PATHS = ['~/Library/Caches/com.apple.Safari', '~/Library/Caches/com.spotify.client', '/private/var/log', '~/Library/Developer/Xcode/DerivedData', '~/Library/Logs/DiagnosticReports', '~/Downloads', '~/.Trash'];
+const BADGE = { video: ['oklch(0.95 0.04 300)', 'oklch(0.45 0.14 300)'], archive: ['oklch(0.95 0.05 80)', 'oklch(0.48 0.12 70)'], disk: ['oklch(0.94 0.03 240)', 'oklch(0.45 0.12 250)'], other: ['oklch(0.94 0.01 220)', 'oklch(0.45 0.02 220)'] };
+const fmt = mb => mb >= GB ? (mb / GB).toFixed(1).replace('.', ',') + ' GB' : Math.round(mb) + ' MB';
+
+class Component extends DCLogic {
+  state = {
+    view: this.props.startView === 'File Besar' ? 'large' : 'clean',
+    phase: 'idle', pct: 0, junkOff: {}, freed: 0,
+    files: FILES, sel: {}, type: 'all', min: 100, query: '', used: 389 * GB, toast: '',
+  };
+  componentWillUnmount() { clearInterval(this.t); clearTimeout(this.tt); }
+  flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  startScan = () => {
+    this.setState({ phase: 'scan', pct: 0 });
+    const step = this.props.fastScan ? 9 : 3;
+    this.t = setInterval(() => this.setState(s => {
+      const pct = Math.min(100, s.pct + step + Math.random() * step);
+      if (pct >= 100) { clearInterval(this.t); return { pct: 100, phase: 'done' }; }
+      return { pct };
+    }), 90);
+  };
+  renderVals() {
+    const s = this.state;
+    const accent = 'oklch(0.55 0.13 175)';
+    const junkSel = JUNK.filter(j => !s.junkOff[j.id]).reduce((a, j) => a + j.mb, 0);
+    const visible = s.files
+      .filter(f => f.mb >= s.min && (s.type === 'all' || f.type === s.type) && f.name.toLowerCase().includes(s.query.toLowerCase()))
+      .sort((a, b) => b.mb - a.mb);
+    const maxMb = Math.max(1, ...visible.map(f => f.mb));
+    const selFiles = s.files.filter(f => s.sel[f.id]);
+    const selMb = selFiles.reduce((a, f) => a + f.mb, 0);
+    const navItem = (id, label, meta) => ({ label, meta, go: () => this.setState({ view: id }), bg: s.view === id ? 'rgba(0,0,0,.08)' : 'transparent', color: '#1d1d1f' });
+    const typeOpts = [['all', 'Semua'], ['video', 'Video'], ['archive', 'Arsip & Installer'], ['disk', 'Disk Image'], ['other', 'Lainnya']];
+    return {
+      nav: [navItem('clean', 'Pembersihan', s.phase === 'done' ? fmt(junkSel) : ''), navItem('large', 'File Besar', String(s.files.length))],
+      diskFree: fmt(512 * GB - s.used), diskUsed: fmt(s.used), diskPct: (s.used / (512 * GB) * 100).toFixed(1) + '%',
+      isClean: s.view === 'clean', isLarge: s.view === 'large',
+      cleanIdle: s.phase === 'idle', cleanScanning: s.phase === 'scan', cleanDone: s.phase === 'done', cleanFinished: s.phase === 'finished',
+      startScan: this.startScan,
+      scanPctLabel: Math.round(s.pct) + '%', scanPath: PATHS[Math.floor(s.pct / 100 * PATHS.length) % PATHS.length],
+      junk: JUNK.map(j => ({ ...j, sizeLabel: fmt(j.mb), checked: !s.junkOff[j.id], toggle: () => this.setState(st => ({ junkOff: { ...st.junkOff, [j.id]: !st.junkOff[j.id] } })) })),
+      junkSelectedLabel: fmt(junkSel),
+      doClean: () => { if (!junkSel) return; this.setState(st => ({ phase: 'finished', freed: junkSel, used: st.used - junkSel })); },
+      resetScan: () => this.setState({ phase: 'idle', pct: 0, junkOff: {} }),
+      freedLabel: fmt(s.freed),
+      visibleCount: visible.length, visibleTotal: fmt(visible.reduce((a, f) => a + f.mb, 0)),
+      minOpts: [[100, '100 MB'], [500, '500 MB'], [1024, '1 GB']].map(([v, label]) => ({ label, pick: () => this.setState({ min: v }), bg: s.min === v ? '#fff' : 'transparent', shadow: s.min === v ? '0 1px 2px rgba(0,0,0,.15)' : 'none' })),
+      query: s.query, onQuery: e => this.setState({ query: e.target.value }),
+      types: typeOpts.map(([v, label]) => ({ label, pick: () => this.setState({ type: v }), bg: s.type === v ? '#1d1d1f' : '#fff', color: s.type === v ? '#fff' : '#1d1d1f', border: s.type === v ? '#1d1d1f' : 'rgba(0,0,0,.12)' })),
+      files: visible.map(f => ({ ...f, sizeLabel: fmt(f.mb), bar: (f.mb / maxMb * 100).toFixed(0) + '%', checked: !!s.sel[f.id], bg: s.sel[f.id] ? 'oklch(0.97 0.02 175)' : 'transparent', badgeBg: BADGE[f.type][0], badgeFg: BADGE[f.type][1], toggle: () => this.setState(st => ({ sel: { ...st.sel, [f.id]: !st.sel[f.id] } })) })),
+      empty: visible.length === 0,
+      selCount: selFiles.length, selTotal: selFiles.length ? fmt(selMb) : '',
+      noSel: !selFiles.length, trashBg: selFiles.length ? accent : 'oklch(0.8 0.04 175)',
+      reveal: () => this.flash(selFiles.length ? 'Membuka ' + selFiles[0].path + ' di Finder' : 'Pilih file terlebih dahulu'),
+      trash: () => {
+        if (!selFiles.length) return;
+        if (this.props.confirmDelete !== false && !window.confirm('Pindahkan ' + selFiles.length + ' file (' + fmt(selMb) + ') ke Sampah?')) return;
+        this.setState(st => ({ files: st.files.filter(f => !st.sel[f.id]), sel: {}, used: st.used - selMb }));
+        this.flash(fmt(selMb) + ' dipindahkan ke Sampah');
+      },
+      toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

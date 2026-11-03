@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+._*
+
+# Go
+.gocache/
+/cekdisk
+*.test
+*.out
+
+# Swift Package Manager / build CleanBro
+CleanBro/.build/
+CleanBro/build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+
+# Editor
+.vscode/
+.idea/
+*.swp
