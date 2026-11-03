@@ -4,6 +4,35 @@ import AppKit
 
 let here = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
+// Turns broom.jpg (dark silhouette on white) into an alpha mask cropped to the silhouette.
+let glyph: (mask: CGImage, box: CGRect) = {
+    let src = NSImage(contentsOf: here.appendingPathComponent("broom.jpg"))!
+        .cgImage(forProposedRect: nil, context: nil, hints: nil)!
+    let w = src.width, h = src.height
+    var px = [UInt8](repeating: 0, count: w * h)
+    let gray = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w,
+                         space: CGColorSpaceCreateDeviceGray(), bitmapInfo: 0)!
+    gray.draw(src, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+    // Ink coverage: white paper -> 0, the ~#484848 silhouette -> 255
+    var minX = w, minY = h, maxX = 0, maxY = 0
+    for y in 0..<h {
+        for x in 0..<w {
+            let v = (255 - Double(px[y * w + x])) / (255 - 72)
+            let a = UInt8(max(0, min(1, v)) * 255)
+            px[y * w + x] = a
+            if a > 128 { minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y) }
+        }
+    }
+    // CGImage masks treat 0 as opaque, so invert
+    let inverted = px.map { 255 - $0 }
+    let provider = CGDataProvider(data: Data(inverted) as CFData)!
+    let full = CGImage(maskWidth: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w,
+                       provider: provider, decode: nil, shouldInterpolate: true)!
+    let crop = CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    return (full.cropping(to: crop)!, CGRect(origin: .zero, size: crop.size))
+}()
+
 func render(_ px: Int) -> Data {
     let s = CGFloat(px)
     let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: px, pixelsHigh: px,
@@ -33,15 +62,22 @@ func render(_ px: Int) -> Data {
         NSColor(srgbRed: 0.00, green: 0.42, blue: 0.38, alpha: 1),
     ])!.draw(in: path, angle: -90)
 
-    // Sparkles symbol, the same one used for "Pembersihan"
-    let cfg = NSImage.SymbolConfiguration(pointSize: 470 * k, weight: .medium)
-        .applying(.init(paletteColors: [.white]))
-    if let sym = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil)?
-        .withSymbolConfiguration(cfg) {
-        let sz = sym.size
-        sym.draw(in: NSRect(x: body.midX - sz.width / 2, y: body.midY - sz.height / 2,
-                            width: sz.width, height: sz.height))
-    }
+    // Broom glyph, fitted into a 560pt box centered on the body
+    let ctx = NSGraphicsContext.current!.cgContext
+    let box: CGFloat = 560 * k
+    let scale = box / max(glyph.box.width, glyph.box.height)
+    let w = glyph.box.width * scale, h = glyph.box.height * scale
+    let dest = CGRect(x: body.midX - w / 2, y: body.midY - h / 2, width: w, height: h)
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -6 * k), blur: 16 * k,
+                  color: NSColor.black.withAlphaComponent(0.25).cgColor)
+    ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+    ctx.interpolationQuality = .high
+    ctx.clip(to: dest, mask: glyph.mask)
+    ctx.setFillColor(NSColor.white.cgColor)
+    ctx.fill(dest)
+    ctx.endTransparencyLayer()
+    ctx.restoreGState()
 
     NSGraphicsContext.restoreGraphicsState()
     return rep.representation(using: .png, properties: [:])!
