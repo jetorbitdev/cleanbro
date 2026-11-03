@@ -186,6 +186,21 @@ final class AppModel {
     init() {
         refreshVolume()
         refreshTrash()
+        promptFullDiskAccessOnFirstLaunch()
+    }
+
+    /// On first launch, asks for Full Disk Access if it hasn't been granted yet.
+    /// The Trash is unreadable without it, which makes it a reliable check.
+    private func promptFullDiskAccessOnFirstLaunch() {
+        let key = "didPromptFullDiskAccess"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        Task.detached(priority: .utility) {
+            guard DeepCleaner.trashContents() == nil else { return }
+            await MainActor.run {
+                UserDefaults.standard.set(true, forKey: key)
+                self.askFullDiskAccess = true
+            }
+        }
     }
 
     func marks(for t: Tool) -> Binding<Set<String>> {
