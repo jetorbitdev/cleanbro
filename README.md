@@ -9,6 +9,31 @@ Two tools for inspecting and tidying up disk usage on macOS:
 
 ![CleanBro](docs/screenshots/clean.png)
 
+## Install the app
+
+Requires macOS 14 (Sonoma) or later, on Apple Silicon or Intel. Pick the easiest option that works for you:
+
+**1. One-line install (easiest)**
+
+Paste this into Terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jetorbitdev/cleanbro/main/install.sh | bash
+```
+
+It downloads the latest release, verifies its checksum, installs it to `/Applications`, and opens it. No Gatekeeper prompt, because files downloaded with `curl` aren't quarantined. It may ask for your password if `/Applications` needs admin rights.
+
+**2. Download the zip**
+
+1. Download `CleanBro.zip` from the [latest release](https://github.com/jetorbitdev/cleanbro/releases/latest).
+2. Double-click it to extract, then drag `CleanBro.app` into **Applications**.
+3. Open it. macOS will refuse with *"can't be opened"* because the app isn't notarized.
+4. Go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
+
+**3. Build from source**: see [Build](#build-1) below.
+
+On first launch, CleanBro asks for **Full Disk Access**. Click **Buka Pengaturan** (Open Settings), turn on CleanBro in the list (or drag it in from the Finder window that opens), then reopen the app.
+
 ## cleanbro (CLI)
 
 ### Install
@@ -149,6 +174,7 @@ git push origin v1.0.0
 .
 ├── main.go            # cleanbro CLI source
 ├── go.mod
+├── install.sh         # one-line installer for the app
 ├── CleanBro/
 │   ├── Package.swift
 │   ├── build.sh       # build & bundle the .app
