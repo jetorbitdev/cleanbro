@@ -9,6 +9,21 @@ Two tools for inspecting and tidying up disk usage on macOS:
 
 ![CleanBro](docs/screenshots/clean.png)
 
+## Table of contents
+
+- [Install the app](#install-the-app)
+- [cleanbro (CLI)](#cleanbro-cli)
+  - [Install](#install)
+  - [Build](#build)
+  - [Usage](#usage)
+- [CleanBro (macOS app)](#cleanbro-macos-app)
+  - [Features](#features)
+  - [Build](#build-1)
+  - [Permissions](#permissions)
+- [CI/CD](#cicd)
+- [Project structure](#project-structure)
+- [License](#license)
+
 ## Install the app
 
 Requires macOS 14 (Sonoma) or later, on Apple Silicon or Intel. Pick the easiest option that works for you:
