@@ -191,7 +191,7 @@ enum FS {
     }
 }
 
-// MARK: - Parallel disk scanner (Swift port of cekdisk)
+// MARK: - Parallel disk scanner (Swift port of the cleanbro CLI)
 
 final class DiskScanner: @unchecked Sendable {
     let root: String

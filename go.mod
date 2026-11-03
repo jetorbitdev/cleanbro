@@ -1,3 +1,3 @@
-module cekdisk
+module cleanbro
 
 go 1.27.1

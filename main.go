@@ -1,4 +1,4 @@
-// cekdisk — fast parallel disk usage scanner for macOS.
+// cleanbro — fast parallel disk usage scanner for macOS.
 package main
 
 import (
@@ -213,9 +213,9 @@ func main() {
 	oneFS := flag.Bool("x", false, "jangan menyeberang ke filesystem/volume lain")
 	workers := flag.Int("j", runtime.NumCPU()*4, "jumlah goroutine paralel")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Pemakaian: cekdisk [opsi] [path]   (default path: ~)\n\n")
+		fmt.Fprintf(os.Stderr, "Pemakaian: cleanbro [opsi] [path]   (default path: ~)\n\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nContoh:\n  cekdisk ~\n  cekdisk -d 2 -n 10 ~/Library\n  sudo cekdisk -d 1 /\n")
+		fmt.Fprintf(os.Stderr, "\nContoh:\n  cleanbro ~\n  cleanbro -d 2 -n 10 ~/Library\n  sudo cleanbro -d 1 /\n")
 	}
 	flag.Parse()
 

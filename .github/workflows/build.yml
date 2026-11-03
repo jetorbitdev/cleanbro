@@ -1,4 +1,4 @@
-# Build CleanBro.app dan cekdisk di setiap push/PR.
+# Build CleanBro.app dan CLI cleanbro di setiap push/PR.
 # Push tag v* (mis. v1.2.0) juga membuat GitHub Release berisi hasil build.
 name: Build
 
@@ -60,7 +60,7 @@ jobs:
           if-no-files-found: error
 
   cli:
-    name: cekdisk
+    name: cleanbro CLI
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
@@ -76,16 +76,16 @@ jobs:
       - name: Build universal
         run: |
           mkdir -p dist
-          GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/cekdisk-arm64 .
-          GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/cekdisk-amd64 .
-          lipo -create -output dist/cekdisk dist/cekdisk-arm64 dist/cekdisk-amd64
-          lipo -archs dist/cekdisk
-          tar -C dist -czf dist/cekdisk-macos-universal.tar.gz cekdisk
+          GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/cleanbro-arm64 .
+          GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/cleanbro-amd64 .
+          lipo -create -output dist/cleanbro dist/cleanbro-arm64 dist/cleanbro-amd64
+          lipo -archs dist/cleanbro
+          tar -C dist -czf dist/cleanbro-cli-macos-universal.tar.gz cleanbro
 
       - uses: actions/upload-artifact@v7
         with:
-          name: cekdisk
-          path: dist/cekdisk-macos-universal.tar.gz
+          name: cleanbro-cli
+          path: dist/cleanbro-cli-macos-universal.tar.gz
           if-no-files-found: error
 
   release:
@@ -106,9 +106,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
-          shasum -a 256 CleanBro.zip cekdisk-macos-universal.tar.gz > SHA256SUMS.txt
+          shasum -a 256 CleanBro.zip cleanbro-cli-macos-universal.tar.gz > SHA256SUMS.txt
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --title "CleanBro $GITHUB_REF_NAME" \
             --generate-notes \
-            CleanBro.zip cekdisk-macos-universal.tar.gz SHA256SUMS.txt
+            CleanBro.zip cleanbro-cli-macos-universal.tar.gz SHA256SUMS.txt

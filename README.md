@@ -4,25 +4,37 @@
 
 Two tools for inspecting and tidying up disk usage on macOS:
 
-- **`cekdisk`**: a Go CLI that scans folder sizes quickly and in parallel, similar to `du`, with a tree view and a list of the largest files.
+- **`cleanbro`**: a Go CLI that scans folder sizes quickly and in parallel, similar to `du`, with a tree view and a list of the largest files.
 - **CleanBro**: a native SwiftUI app for cleaning junk files, uninstalling apps, and analyzing your disk.
 
 ![CleanBro](docs/screenshots/clean.png)
 
-## cekdisk (CLI)
+## cleanbro (CLI)
+
+### Install
+
+Download `cleanbro-cli-macos-universal.tar.gz` from the [latest release](https://github.com/jetorbitdev/cleanbro/releases/latest), then:
+
+```sh
+tar -xzf cleanbro-cli-macos-universal.tar.gz
+xattr -d com.apple.quarantine cleanbro
+sudo mv cleanbro /usr/local/bin/
+```
 
 ### Build
 
 Requires Go (see the version in `go.mod`).
 
 ```sh
-go build -o cekdisk .
+go build -o bin/cleanbro .
 ```
+
+The output goes to `bin/` because a plain `-o cleanbro` would collide with the `CleanBro/` folder on case-insensitive filesystems.
 
 ### Usage
 
 ```sh
-cekdisk [options] [path]      # default path: ~
+cleanbro [options] [path]     # default path: ~
 ```
 
 | Option | Default | Description |
@@ -36,9 +48,9 @@ cekdisk [options] [path]      # default path: ~
 Examples:
 
 ```sh
-cekdisk ~
-cekdisk -d 2 -n 10 ~/Library
-sudo cekdisk -d 1 /
+cleanbro ~
+cleanbro -d 2 -n 10 ~/Library
+sudo cleanbro -d 1 /
 ```
 
 Sample output:
@@ -91,13 +103,13 @@ open build/CleanBro.app
 
 `build.sh` builds a universal (Apple Silicon + Intel) release with SwiftPM, assembles the `CleanBro.app` bundle (with `Icon/AppIcon.icns`) in `CleanBro/build/`, signs it ad-hoc, and creates `CleanBro.zip` for sharing.
 
-To use it on another Mac, share `CleanBro.zip` (don't copy the `.app` folder directly). Because the app isn't notarized by Apple, macOS blocks it on first launch: open **System Settings → Privacy & Security** and click **Open Anyway**. Or from Terminal:
+To use it on another Mac, share `CleanBro.zip` (don't copy the `.app` folder directly). Because the app isn't notarized by Apple, macOS blocks it when it was downloaded or received through a browser, AirDrop, or a chat app. On macOS 26 this shows up as *"The application “CleanBro.app” can't be opened."* (running the binary from Terminal reports `operation not permitted`). To allow it, open **System Settings → Privacy & Security** and click **Open Anyway**, or from Terminal:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/CleanBro.app
 ```
 
-If you get *"The application “CleanBro.app” can't be opened."*, the bundle was most likely damaged in transit (the executable permission was lost, or `._*` files ended up inside it). Re-extract the zip with Archive Utility (double-click it), or repair it from Terminal:
+If it still won't open, the bundle may have been damaged in transit (the executable permission was lost, or `._*` files ended up inside it). Re-extract the zip with Archive Utility (double-click it), or repair it from Terminal:
 
 ```sh
 APP=/Applications/CleanBro.app
@@ -122,9 +134,9 @@ To read the Trash and some folders in `~/Library`, grant CleanBro **Full Disk Ac
 
 ## CI/CD
 
-GitHub Actions ([`.github/workflows/build.yml`](.github/workflows/build.yml)) builds `CleanBro.app` and a universal `cekdisk` on every push to `main` and on pull requests. Build outputs can be downloaded as artifacts from the **Actions** tab.
+GitHub Actions ([`.github/workflows/build.yml`](.github/workflows/build.yml)) builds `CleanBro.app` and the universal `cleanbro` CLI on every push to `main` and on pull requests. Build outputs can be downloaded as artifacts from the **Actions** tab.
 
-To release, push a version tag. The workflow creates a GitHub Release containing `CleanBro.zip`, `cekdisk-macos-universal.tar.gz`, and `SHA256SUMS.txt`, with the app version taken from the tag name:
+To release, push a version tag. The workflow creates a GitHub Release containing `CleanBro.zip`, `cleanbro-cli-macos-universal.tar.gz`, and `SHA256SUMS.txt`, with the app version taken from the tag name:
 
 ```sh
 git tag v1.0.0
@@ -135,7 +147,7 @@ git push origin v1.0.0
 
 ```
 .
-├── main.go            # cekdisk source
+├── main.go            # cleanbro CLI source
 ├── go.mod
 ├── CleanBro/
 │   ├── Package.swift
