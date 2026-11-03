@@ -1,4 +1,4 @@
-<p align="center"><img src="CleanBro/Icon/AppIcon.png" width="128" alt="CleanBro icon"></p>
+<p align="center"><img src="CleanBro/Icon/AppIcon.png?v=2" width="128" alt="CleanBro icon"></p>
 
 # CleanBro
 
@@ -7,7 +7,7 @@ Two tools for inspecting and tidying up disk usage on macOS:
 - **`cleanbro`**: a Go CLI that scans folder sizes quickly and in parallel, similar to `du`, with a tree view and a list of the largest files.
 - **CleanBro**: a native SwiftUI app for cleaning junk files, uninstalling apps, and analyzing your disk.
 
-![CleanBro](docs/screenshots/clean.png)
+![CleanBro](docs/screenshots/clean.png?v=2)
 
 ## Table of contents
 
