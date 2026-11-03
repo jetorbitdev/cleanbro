@@ -9,6 +9,9 @@ swift build -c release $ARCHS
 BIN="$(swift build -c release $ARCHS --show-bin-path)/CleanBro"
 APP="build/CleanBro.app"
 ZIP="build/CleanBro.zip"
+# Bisa di-override dari CI, mis. VERSION=1.2.0 BUILD_NUMBER=42 ./build.sh
+VERSION="${VERSION:-1.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-1}"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -24,8 +27,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.jetorbit.cleanbro</string>
   <key>CFBundleExecutable</key><string>CleanBro</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>$VERSION</string>
+  <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>NSHighResolutionCapable</key><true/>

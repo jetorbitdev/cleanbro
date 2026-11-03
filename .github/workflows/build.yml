@@ -1,0 +1,113 @@
+# Build CleanBro.app dan cekdisk di setiap push/PR.
+# Push tag v* (mis. v1.2.0) juga membuat GitHub Release berisi hasil build.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: CleanBro.app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pilih Xcode 16
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)"
+          swift --version
+
+      - name: Tentukan versi
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.0" >> "$GITHUB_ENV"
+          fi
+          echo "BUILD_NUMBER=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: CleanBro/.build
+          key: spm-${{ runner.os }}-${{ hashFiles('CleanBro/Package.swift', 'CleanBro/Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      - name: Build
+        run: ./CleanBro/build.sh
+
+      - name: Verifikasi bundle
+        run: |
+          APP=CleanBro/build/CleanBro.app
+          lipo -archs "$APP/Contents/MacOS/CleanBro"
+          codesign --verify --deep --strict "$APP"
+          plutil -p "$APP/Contents/Info.plist" | grep -E 'CFBundle(ShortVersionString|Version)'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CleanBro
+          path: CleanBro/build/CleanBro.zip
+          if-no-files-found: error
+
+  cli:
+    name: cekdisk
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build universal
+        run: |
+          mkdir -p dist
+          GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/cekdisk-arm64 .
+          GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/cekdisk-amd64 .
+          lipo -create -output dist/cekdisk dist/cekdisk-arm64 dist/cekdisk-amd64
+          lipo -archs dist/cekdisk
+          tar -C dist -czf dist/cekdisk-macos-universal.tar.gz cekdisk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cekdisk
+          path: dist/cekdisk-macos-universal.tar.gz
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [app, cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Buat release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          shasum -a 256 CleanBro.zip cekdisk-macos-universal.tar.gz > SHA256SUMS.txt
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "CleanBro $GITHUB_REF_NAME" \
+            --generate-notes \
+            CleanBro.zip cekdisk-macos-universal.tar.gz SHA256SUMS.txt

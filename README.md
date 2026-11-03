@@ -89,6 +89,17 @@ swift run
 
 Agar Sampah dan sebagian folder di `~/Library` bisa dibaca, beri CleanBro **Full Disk Access** di System Settings → Privacy & Security → Full Disk Access. Aplikasi akan menampilkan pengingat kalau izin ini belum diberikan.
 
+## CI/CD
+
+GitHub Actions ([`.github/workflows/build.yml`](.github/workflows/build.yml)) mem-build `CleanBro.app` dan `cekdisk` (universal) di setiap push ke `main` dan pull request. Hasil build bisa diunduh dari tab **Actions** sebagai artifact.
+
+Untuk merilis, push tag versi. Workflow akan membuat GitHub Release berisi `CleanBro.zip`, `cekdisk-macos-universal.tar.gz`, dan `SHA256SUMS.txt`, dengan versi app diambil dari nama tag:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
 ## Struktur
 
 ```
