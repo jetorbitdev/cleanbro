@@ -1,4 +1,4 @@
-# cekdiskmac
+# CleanBro
 
 Dua alat untuk melihat dan merapikan penggunaan disk di macOS:
 
@@ -70,7 +70,13 @@ cd CleanBro
 open build/CleanBro.app
 ```
 
-`build.sh` melakukan build release dengan SwiftPM, merakit bundle `CleanBro.app` di `CleanBro/build/`, lalu menandatanganinya secara ad-hoc.
+`build.sh` melakukan build release universal (Apple Silicon + Intel) dengan SwiftPM, merakit bundle `CleanBro.app` di `CleanBro/build/`, menandatanganinya secara ad-hoc, lalu membuat `CleanBro.zip` untuk dibagikan.
+
+Untuk memakai di Mac lain, bagikan `CleanBro.zip` (jangan salin folder `.app` langsung). Karena belum dinotarisasi Apple, saat pertama dibuka macOS akan memblokirnya: buka **System Settings → Privacy & Security**, lalu klik **Open Anyway**. Atau lewat Terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/CleanBro.app
+```
 
 Untuk development:
 
@@ -95,3 +101,11 @@ Agar Sampah dan sebagian folder di `~/Library` bisa dibaca, beri CleanBro **Full
 │   └── Sources/CleanBro/
 └── template/          # mockup desain UI (HTML)
 ```
+
+## Lisensi
+
+Copyright (C) 2026 gilang
+
+Program ini adalah perangkat lunak bebas: kamu boleh menyebarkan dan/atau memodifikasinya di bawah ketentuan [GNU General Public License versi 3](LICENSE) seperti yang diterbitkan oleh Free Software Foundation.
+
+Program ini disebarkan dengan harapan akan berguna, tetapi TANPA JAMINAN APA PUN. Lihat file [LICENSE](LICENSE) untuk detailnya.
