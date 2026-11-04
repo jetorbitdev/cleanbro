@@ -6,6 +6,14 @@ struct AnalysisGate<Content: View>: View {
     @Environment(AppModel.self) private var model
     @ViewBuilder var content: () -> Content
 
+    private var partialText: String {
+        let d = model.progress.dirs, f = model.progress.files
+        let dEn = d == 1 ? "1 folder" : "\(Fmt.count(d)) folders"
+        let fEn = f == 1 ? "1 file" : "\(Fmt.count(f)) files"
+        return L("Scan stopped. Results only include the \(dEn) and \(fEn) read so far. Sizes marked ≥ are incomplete.",
+                 "Pemindaian dihentikan. Hasil hanya mencakup \(Fmt.count(d)) folder dan \(Fmt.count(f)) file yang sudah dibaca. Ukuran bertanda ≥ belum lengkap.")
+    }
+
     var body: some View {
         Group {
             switch model.scanState {
@@ -19,7 +27,7 @@ struct AnalysisGate<Content: View>: View {
                         Divider()
                     }
                     if model.scanPartial {
-                        PartialBanner(text: "Pemindaian dihentikan. Hasil hanya mencakup \(Fmt.count(model.progress.dirs)) folder dan \(Fmt.count(model.progress.files)) file yang sudah dibaca. Ukuran bertanda ≥ belum lengkap.") {
+                        PartialBanner(text: partialText) {
                             model.startAnalysis()
                         }
                         .padding(.horizontal, 20).padding(.vertical, 8)
@@ -36,15 +44,15 @@ struct AnalysisGate<Content: View>: View {
                         Button { model.scan(path: p.path) } label: { Label(p.title, systemImage: p.icon) }
                     }
                     Divider()
-                    Button("Pilih Folder…") { model.chooseFolder() }
+                    Button(L("Choose Folder…", "Pilih Folder…")) { model.chooseFolder() }
                 } label: {
                     Label((model.scanRoot.path as NSString).abbreviatingWithTildeInPath, systemImage: "folder")
                         .labelStyle(.titleAndIcon)
                 }
-                .help("Pilih folder yang dipindai")
+                .help(L("Choose the folder to scan", "Pilih folder yang dipindai"))
                 .disabled(model.scanState == .scanning)
-                Button { model.startAnalysis() } label: { Label("Pindai Ulang", systemImage: "arrow.clockwise") }
-                    .help("Pindai ulang")
+                Button { model.startAnalysis() } label: { Label(L("Rescan", "Pindai Ulang"), systemImage: "arrow.clockwise") }
+                    .help(L("Rescan", "Pindai ulang"))
                     .disabled(model.scanState == .scanning)
             }
         }
@@ -56,9 +64,10 @@ struct AnalysisGate<Content: View>: View {
                 .strokeBorder(Color.accentTeal.opacity(0.15), lineWidth: 10)
                 .frame(width: 148, height: 148)
                 .overlay(Image(systemName: "internaldrive").font(.system(size: 40)).foregroundStyle(.secondary))
-            Text("Analisis penggunaan disk")
+            Text(L("Analyze Disk Usage", "Analisis penggunaan disk"))
                 .font(.system(size: 24, weight: .semibold))
-            Text("CleanBro akan menghitung ukuran setiap folder dan file di \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath), lalu menampilkan yang terbesar dan yang sudah lama tidak diubah.")
+            Text(L("CleanBro will measure every folder and file in \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath), then show the largest ones and those that haven't been modified in a long time.",
+                   "CleanBro akan menghitung ukuran setiap folder dan file di \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath), lalu menampilkan yang terbesar dan yang sudah lama tidak diubah."))
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 440)
             HStack(spacing: 6) {
@@ -67,8 +76,8 @@ struct AnalysisGate<Content: View>: View {
                 }
             }
             HStack {
-                Button("Pilih Folder…") { model.chooseFolder() }.controlSize(.large)
-                Button("Pindai") { model.startAnalysis() }
+                Button(L("Choose Folder…", "Pilih Folder…")) { model.chooseFolder() }.controlSize(.large)
+                Button(L("Scan", "Pindai")) { model.startAnalysis() }
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
@@ -84,7 +93,8 @@ struct AnalysisGate<Content: View>: View {
             Text(Fmt.size(p.bytes))
                 .font(.system(size: 48, weight: .light)).monospacedDigit()
             ProgressView().progressViewStyle(.linear).frame(width: 360)
-            Text("\(Fmt.count(p.dirs)) folder · \(Fmt.count(p.files)) file")
+            Text(L("\(p.dirs == 1 ? "1 folder" : "\(Fmt.count(p.dirs)) folders") · \(p.files == 1 ? "1 file" : "\(Fmt.count(p.files)) files")",
+                   "\(Fmt.count(p.dirs)) folder · \(Fmt.count(p.files)) file"))
                 .foregroundStyle(.secondary).monospacedDigit()
             Text((p.current as NSString).abbreviatingWithTildeInPath)
                 .font(.system(size: 12, design: .monospaced)).foregroundStyle(.tertiary)
@@ -123,7 +133,7 @@ struct ItemTable: View {
             }
             .width(20)
 
-            TableColumn("Nama", value: \.name) { item in
+            TableColumn(L("Name", "Nama"), value: \.name) { item in
                 HStack(spacing: 10) {
                     Text(item.badge)
                         .font(.system(size: 9, weight: .bold)).tracking(0.4)
@@ -140,7 +150,7 @@ struct ItemTable: View {
             }
             .width(min: 220, ideal: 420)
 
-            TableColumn("Diubah", value: \.modified) { item in
+            TableColumn(L("Modified", "Diubah"), value: \.modified) { item in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(Fmt.date(item.modified))
                     if showRelativeDate {
@@ -151,7 +161,7 @@ struct ItemTable: View {
             }
             .width(min: 100, ideal: 130, max: 180)
 
-            TableColumn("Ukuran", value: \.size) { item in
+            TableColumn(L("Size", "Ukuran"), value: \.size) { item in
                 VStack(alignment: .trailing, spacing: 4) {
                     if let why = item.skipped {
                         Text(why.label)
@@ -164,7 +174,7 @@ struct ItemTable: View {
                         Text(item.partial ? "≥ " + Fmt.size(item.size) : Fmt.size(item.size))
                             .monospacedDigit()
                             .foregroundStyle(item.partial ? .secondary : .primary)
-                            .help(item.partial ? "Belum semua isi folder ini terhitung" : "")
+                            .help(item.partial ? L("Not all contents of this folder have been counted", "Belum semua isi folder ini terhitung") : "")
                     }
                     GeometryReader { g in
                         ZStack(alignment: .leading) {
@@ -183,26 +193,26 @@ struct ItemTable: View {
             let paths = Array(ids)
             if paths.count == 1, let item = items.first(where: { $0.id == paths[0] }), item.isDir {
                 if item.skipped != nil {
-                    Button("Pindai Folder Ini") { model.scan(path: item.path) }
+                    Button(L("Scan This Folder", "Pindai Folder Ini")) { model.scan(path: item.path) }
                 } else if let onOpen {
-                    Button("Buka Folder") { onOpen(item) }
+                    Button(L("Open Folder", "Buka Folder")) { onOpen(item) }
                 }
                 if AppUninstaller.appFolders.contains(where: { item.path.hasPrefix($0 + "/") }) {
-                    Button("Uninstall…") { model.beginUninstall(path: item.path) }
+                    Button(L("Uninstall…", "Uninstall…")) { model.beginUninstall(path: item.path) }
                 }
                 if item.kind == .folder {
                     let always = model.alwaysSkip.contains(item.path)
-                    Button(always ? "Jangan Lewati Lagi" : "Selalu Lewati Saat Memindai") {
+                    Button(always ? L("Stop Skipping This Folder", "Jangan Lewati Lagi") : L("Always Skip When Scanning", "Selalu Lewati Saat Memindai")) {
                         model.setAlwaysSkip(item.path, !always)
                     }
                 }
             }
-            Button("Tampilkan di Finder") { model.reveal(paths) }
+            Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal(paths) }
             Divider()
-            Button("Centang") { marked.formUnion(paths) }
-            Button("Hapus Centang") { marked.subtract(paths) }
+            Button(L("Check", "Centang")) { marked.formUnion(paths) }
+            Button(L("Uncheck", "Hapus Centang")) { marked.subtract(paths) }
             Divider()
-            Button("Hapus…", role: .destructive) {
+            Button(L("Delete…", "Hapus…"), role: .destructive) {
                 model.requestDelete(items.filter { ids.contains($0.id) }, from: model.tool)
             }
         } primaryAction: { ids in
@@ -229,21 +239,21 @@ struct SelectionBar: View {
         let chosen = visible.filter { marked.contains($0.id) }
         let total = chosen.reduce(Int64(0)) { $0 + $1.size }
         HStack(spacing: 10) {
-            Text("\(chosen.count) dipilih")
+            Text(L("\(chosen.count) selected", "\(chosen.count) dipilih"))
             if !chosen.isEmpty { Text(Fmt.size(total)).foregroundStyle(.secondary).monospacedDigit() }
-            Button(chosen.count == visible.count && !visible.isEmpty ? "Batal Pilih Semua" : "Pilih Semua") {
+            Button(chosen.count == visible.count && !visible.isEmpty ? L("Deselect All", "Batal Pilih Semua") : L("Select All", "Pilih Semua")) {
                 if chosen.count == visible.count { marked.subtract(visible.map(\.id)) }
                 else { marked.formUnion(visible.map(\.id)) }
             }
             .buttonStyle(.link)
             .disabled(visible.isEmpty)
             Spacer()
-            Button("Tampilkan di Finder") { model.reveal(chosen.map(\.path)) }
+            Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal(chosen.map(\.path)) }
                 .disabled(chosen.isEmpty)
             Button {
                 model.requestDelete(chosen, from: model.tool)
             } label: {
-                Label("Hapus…", systemImage: "trash")
+                Label(L("Delete…", "Hapus…"), systemImage: "trash")
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)
@@ -282,17 +292,17 @@ struct SortMenu: View {
 
     var body: some View {
         Menu {
-            Button("Ukuran — terbesar dulu") { sortOrder = [KeyPathComparator(\Item.size, order: .reverse)] }
-            Button("Ukuran — terkecil dulu") { sortOrder = [KeyPathComparator(\Item.size, order: .forward)] }
+            Button(L("Size — Largest First", "Ukuran — terbesar dulu")) { sortOrder = [KeyPathComparator(\Item.size, order: .reverse)] }
+            Button(L("Size — Smallest First", "Ukuran — terkecil dulu")) { sortOrder = [KeyPathComparator(\Item.size, order: .forward)] }
             Divider()
-            Button("Tanggal — terlama dulu") { sortOrder = [KeyPathComparator(\Item.modified, order: .forward)] }
-            Button("Tanggal — terbaru dulu") { sortOrder = [KeyPathComparator(\Item.modified, order: .reverse)] }
+            Button(L("Date — Oldest First", "Tanggal — terlama dulu")) { sortOrder = [KeyPathComparator(\Item.modified, order: .forward)] }
+            Button(L("Date — Newest First", "Tanggal — terbaru dulu")) { sortOrder = [KeyPathComparator(\Item.modified, order: .reverse)] }
             Divider()
-            Button("Nama A–Z") { sortOrder = [KeyPathComparator(\Item.name, order: .forward)] }
+            Button(L("Name A–Z", "Nama A–Z")) { sortOrder = [KeyPathComparator(\Item.name, order: .forward)] }
         } label: {
-            Label("Urutkan", systemImage: "arrow.up.arrow.down")
+            Label(L("Sort", "Urutkan"), systemImage: "arrow.up.arrow.down")
         }
-        .help("Urutkan berdasarkan ukuran atau tanggal")
+        .help(L("Sort by size or date", "Urutkan berdasarkan ukuran atau tanggal"))
     }
 }
 
@@ -313,10 +323,10 @@ struct StopButton: View {
         if stopping {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Menghentikan…").foregroundStyle(.secondary)
+                Text(L("Stopping…", "Menghentikan…")).foregroundStyle(.secondary)
             }
         } else {
-            Button("Berhenti & Tampilkan Hasil", action: action)
+            Button(L("Stop & Show Results", "Berhenti & Tampilkan Hasil"), action: action)
                 .keyboardShortcut(.cancelAction)
         }
     }
@@ -330,7 +340,7 @@ struct SlowFolders: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Folder ini butuh waktu lama", systemImage: "tortoise")
+            Label(L("These folders are taking a long time", "Folder ini butuh waktu lama"), systemImage: "tortoise")
                 .font(.callout.weight(.medium)).foregroundStyle(.orange)
             ForEach(progress.stuck, id: \.path) { dir in
                 HStack(spacing: 10) {
@@ -339,21 +349,21 @@ struct SlowFolders: View {
                         .lineLimit(1).truncationMode(.head)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .help(dir.path)
-                    Text("\(dir.seconds) dtk").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    Text(L("\(dir.seconds) sec", "\(dir.seconds) dtk")).font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     let chain = progress.chain(dir)
-                    Menu("Lewati") {
+                    Menu(L("Skip", "Lewati")) {
                         if chain.count > 1 {
-                            Section("Lewati folder") {
+                            Section(L("Skip Folder", "Lewati folder")) {
                                 ForEach(chain.reversed(), id: \.path) { c in
-                                    Button("\((c.path as NSString).lastPathComponent)  ·  \(c.seconds) dtk") {
+                                    Button(L("\((c.path as NSString).lastPathComponent)  ·  \(c.seconds) sec", "\((c.path as NSString).lastPathComponent)  ·  \(c.seconds) dtk")) {
                                         model.skipFolder(c.path)
                                     }
                                 }
                             }
                         }
-                        Section("Juga di pemindaian berikutnya") {
+                        Section(L("Also in Future Scans", "Juga di pemindaian berikutnya")) {
                             ForEach(chain.reversed(), id: \.path) { c in
-                                Button("Selalu lewati \((c.path as NSString).lastPathComponent)") {
+                                Button(L("Always Skip \((c.path as NSString).lastPathComponent)", "Selalu lewati \((c.path as NSString).lastPathComponent)")) {
                                     model.skipFolderAlways(c.path)
                                 }
                             }
@@ -362,7 +372,7 @@ struct SlowFolders: View {
                         model.skipFolder(dir.path)
                     }
                     .fixedSize()
-                    .help("Klik untuk melewati folder ini. Buka menu untuk memilih folder induknya atau selalu melewatinya.")
+                    .help(L("Click to skip this folder. Open the menu to choose its parent folder or to always skip it.", "Klik untuk melewati folder ini. Buka menu untuk memilih folder induknya atau selalu melewatinya."))
                 }
             }
         }
@@ -380,7 +390,7 @@ struct SkipSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Folder ini selalu dilewati saat analisis disk. Folder cloud (Google Drive, iCloud…) dan volume jaringan sudah dilewati otomatis.")
+            Text(L("These folders are always skipped during disk analysis. Cloud folders (Google Drive, iCloud…) and network volumes are skipped automatically.", "Folder ini selalu dilewati saat analisis disk. Folder cloud (Google Drive, iCloud…) dan volume jaringan sudah dilewati otomatis."))
                 .font(.callout).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             List(model.alwaysSkip, id: \.self, selection: $selection) { path in
@@ -391,7 +401,7 @@ struct SkipSettings: View {
             .listStyle(.bordered(alternatesRowBackgrounds: true))
             .overlay {
                 if model.alwaysSkip.isEmpty {
-                    Text("Belum ada folder").foregroundStyle(.tertiary)
+                    Text(L("No folders yet", "Belum ada folder")).foregroundStyle(.tertiary)
                 }
             }
             .onDeleteCommand { remove() }
@@ -418,8 +428,12 @@ struct SkippedBanner: View {
 
     var body: some View {
         let names = folders.prefix(3).map { ($0.path as NSString).abbreviatingWithTildeInPath }
-        let more = folders.count > 3 ? " dan \(folders.count - 3) lainnya" : ""
-        let text = "\(folders.count) folder dilewati: \(names.joined(separator: ", "))\(more). Klik dua kali folder yang dilewati untuk memindainya. Daftar Selalu Lewati ada di Pengaturan (⌘,)."
+        let n = folders.count
+        let list = names.joined(separator: ", ")
+        let moreEn = n > 3 ? " and \(n - 3) more" : ""
+        let moreId = n > 3 ? " dan \(n - 3) lainnya" : ""
+        let text = L("\(n == 1 ? "1 folder" : "\(n) folders") skipped: \(list)\(moreEn). Double-click a skipped folder to scan it. The Always Skip list is in Settings (⌘,).",
+                     "\(n) folder dilewati: \(list)\(moreId). Klik dua kali folder yang dilewati untuk memindainya. Daftar Selalu Lewati ada di Pengaturan (⌘,).")
         HStack(spacing: 10) {
             Image(systemName: "arrow.uturn.forward.circle.fill").foregroundStyle(.secondary)
             Text(text).font(.callout)
@@ -442,7 +456,7 @@ struct PartialBanner: View {
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(text)
-            Button("Pindai Lengkap", action: rescan)
+            Button(L("Full Scan", "Pindai Lengkap"), action: rescan)
                 .fixedSize()
         }
         .padding(10)

@@ -12,25 +12,41 @@ struct JunkItem: Identifiable, Hashable {
 
 struct JunkCategory: Identifiable {
     let id: String
-    let name: String
     let icon: String
     var items: [JunkItem]
-    var note: String?
+    /// The folder couldn't be read (missing Full Disk Access).
+    var needsAccess = false
+
+    /// Displayed title, looked up by `id` on every access so it follows the current language.
+    var name: String {
+        switch id {
+        case "cache": L("App Caches", "Cache aplikasi")
+        case "logs": L("Logs & Crash Reports", "Log & laporan crash")
+        case "dev": L("Developer Data", "Data developer")
+        case "dl": L("Incomplete Downloads", "Unduhan tidak lengkap")
+        case "trash": L("Trash Contents", "Isi Sampah")
+        default: id
+        }
+    }
+
+    var note: String? {
+        needsAccess ? L("Needs Full Disk Access permission", "Butuh izin Full Disk Access") : nil
+    }
 
     var size: Int64 { items.reduce(0) { $0 + $1.size } }
 
     var desc: String {
         if let note { return note }
-        if items.isEmpty { return "Sudah bersih" }
+        if items.isEmpty { return L("Already clean", "Sudah bersih") }
         let top = items.prefix(3).map(\.name).joined(separator: ", ")
         let rest = items.count - 3
-        return rest > 0 ? "\(top), dan \(rest) lainnya" : top
+        return rest > 0 ? L("\(top), and \(rest) more", "\(top), dan \(rest) lainnya") : top
     }
 }
 
 enum JunkScanner {
     private struct Def {
-        let id: String, name: String, icon: String
+        let id: String, icon: String
         let roots: [String]
         var match: ((String) -> Bool)? = nil
     }
@@ -38,24 +54,24 @@ enum JunkScanner {
     private static var defs: [Def] {
         let h = NSHomeDirectory()
         return [
-            Def(id: "cache", name: "Cache aplikasi", icon: "shippingbox",
+            Def(id: "cache", icon: "shippingbox",
                 roots: [h + "/Library/Caches"]),
-            Def(id: "logs", name: "Log & laporan crash", icon: "doc.text.magnifyingglass",
+            Def(id: "logs", icon: "doc.text.magnifyingglass",
                 roots: [h + "/Library/Logs"]),
-            Def(id: "dev", name: "Data developer", icon: "hammer",
+            Def(id: "dev", icon: "hammer",
                 roots: [h + "/Library/Developer/Xcode/DerivedData",
                         h + "/Library/Developer/Xcode/iOS DeviceSupport",
                         h + "/Library/Developer/CoreSimulator/Caches",
                         h + "/.npm/_cacache",
                         h + "/.gradle/caches",
                         h + "/.cache"]),
-            Def(id: "dl", name: "Unduhan tidak lengkap", icon: "arrow.down.circle.dotted",
+            Def(id: "dl", icon: "arrow.down.circle.dotted",
                 roots: [h + "/Downloads"],
                 match: { n in
                     let ext = (n as NSString).pathExtension.lowercased()
                     return ["crdownload", "part", "partial", "download", "opdownload"].contains(ext)
                 }),
-            Def(id: "trash", name: "Isi Sampah", icon: "trash",
+            Def(id: "trash", icon: "trash",
                 roots: [h + "/.Trash"]),
         ]
     }
@@ -78,8 +94,7 @@ enum JunkScanner {
                     candidates.append((cats.count, FS.join(root, n), label))
                 }
             }
-            cats.append(JunkCategory(id: def.id, name: def.name, icon: def.icon, items: [],
-                                     note: unreadable ? "Butuh izin Full Disk Access" : nil))
+            cats.append(JunkCategory(id: def.id, icon: def.icon, items: [], needsAccess: unreadable))
         }
 
         progress.setTotal(candidates.count)
@@ -162,7 +177,7 @@ enum DeepCleaner {
         let fm = FileManager.default
         for t in targets {
             if isProtected(t.path) {
-                r.failed.append((t.path, "Dilindungi"))
+                r.failed.append((t.path, L("Protected", "Dilindungi")))
                 continue
             }
             if mode == .trash && isInTrash(t.path) {

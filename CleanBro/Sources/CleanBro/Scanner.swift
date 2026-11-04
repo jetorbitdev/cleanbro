@@ -10,18 +10,20 @@ enum SkipReason: Hashable {
     var label: String {
         switch self {
         case .cloud: "Cloud"
-        case .network: "Jaringan"
-        case .user: "Dilewati"
-        case .always: "Selalu dilewati"
+        case .network: L("Network", "Jaringan")
+        case .user: L("Skipped", "Dilewati")
+        case .always: L("Always skipped", "Selalu dilewati")
         }
     }
 
     var help: String {
         switch self {
-        case .cloud: "Folder cloud (Google Drive, iCloud, Dropbox…) dilewati: membacanya lambat dan isinya sering hanya placeholder."
-        case .network: "Volume jaringan dilewati: membacanya lambat dan tidak memakai disk Mac ini."
-        case .user: "Dilewati saat pemindaian. Ukuran belum dihitung."
-        case .always: "Ada di daftar Selalu Lewati (Pengaturan). Ukuran belum dihitung."
+        case .cloud: L("Cloud folders (Google Drive, iCloud, Dropbox…) are skipped: reading them is slow and they often contain only placeholders.",
+                       "Folder cloud (Google Drive, iCloud, Dropbox…) dilewati: membacanya lambat dan isinya sering hanya placeholder.")
+        case .network: L("Network volumes are skipped: reading them is slow and they don't use this Mac's disk.",
+                         "Volume jaringan dilewati: membacanya lambat dan tidak memakai disk Mac ini.")
+        case .user: L("Skipped during the scan. Size not calculated yet.", "Dilewati saat pemindaian. Ukuran belum dihitung.")
+        case .always: L("On the Always Skip list (Settings). Size not calculated yet.", "Ada di daftar Selalu Lewati (Pengaturan). Ukuran belum dihitung.")
         }
     }
 }

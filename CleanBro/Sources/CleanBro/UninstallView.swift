@@ -16,12 +16,12 @@ struct AppsView: View {
             .sorted(using: sortOrder)
         VStack(spacing: 0) {
             if model.appsLoading && model.apps.isEmpty {
-                ProgressView("Membaca aplikasi…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView(L("Reading apps…", "Membaca aplikasi…")).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if rows.isEmpty {
-                EmptyRows(text: "Tidak ada aplikasi yang cocok.")
+                EmptyRows(text: L("No matching apps.", "Tidak ada aplikasi yang cocok."))
             } else {
                 Table(rows, selection: $selection, sortOrder: $sortOrder) {
-                    TableColumn("Nama", value: \.name) { app in
+                    TableColumn(L("Name", "Nama"), value: \.name) { app in
                         HStack(spacing: 10) {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
                                 .resizable().frame(width: 28, height: 28)
@@ -33,7 +33,7 @@ struct AppsView: View {
                         .padding(.vertical, 2)
                     }
                     .width(min: 240, ideal: 420)
-                    TableColumn("Ukuran", value: \.size) { app in
+                    TableColumn(L("Size", "Ukuran"), value: \.size) { app in
                         Text(Fmt.size(app.size)).monospacedDigit()
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
@@ -41,8 +41,8 @@ struct AppsView: View {
                 }
                 .contextMenu(forSelectionType: InstalledApp.ID.self) { ids in
                     if let id = ids.first, let app = model.apps.first(where: { $0.id == id }) {
-                        Button("Uninstall…") { model.uninstallTarget = app }
-                        Button("Tampilkan di Finder") { model.reveal([app.path]) }
+                        Button(L("Uninstall…", "Uninstall…")) { model.uninstallTarget = app }
+                        Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal([app.path]) }
                     }
                 } primaryAction: { ids in
                     if let id = ids.first, let app = model.apps.first(where: { $0.id == id }) { model.uninstallTarget = app }
@@ -50,13 +50,14 @@ struct AppsView: View {
             }
             Divider()
             HStack {
-                Text("\(rows.count) aplikasi · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))")
+                Text(L("\(rows.count) \(rows.count == 1 ? "app" : "apps") · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))",
+                         "\(rows.count) aplikasi · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))"))
                     .foregroundStyle(.secondary).monospacedDigit()
                 Spacer()
                 Button {
                     if let app = model.apps.first(where: { $0.id == selection }) { model.uninstallTarget = app }
                 } label: {
-                    Label("Uninstall…", systemImage: "trash")
+                    Label(L("Uninstall…", "Uninstall…"), systemImage: "trash")
                 }
                 .buttonStyle(.borderedProminent).tint(.red)
                 .disabled(selection == nil)
@@ -66,11 +67,11 @@ struct AppsView: View {
             .padding(.horizontal, 20).padding(.vertical, 12)
             .background(.bar)
         }
-        .navigationTitle("Uninstall Aplikasi")
-        .searchable(text: $query, placement: .toolbar, prompt: "Cari aplikasi")
+        .navigationTitle(L("Uninstall Apps", "Uninstall Aplikasi"))
+        .searchable(text: $query, placement: .toolbar, prompt: L("Search apps", "Cari aplikasi"))
         .toolbar {
             ToolbarItem {
-                Button { model.loadApps() } label: { Label("Muat Ulang", systemImage: "arrow.clockwise") }
+                Button { model.loadApps() } label: { Label(L("Reload", "Muat Ulang"), systemImage: "arrow.clockwise") }
                     .disabled(model.appsLoading)
             }
         }
@@ -99,14 +100,14 @@ struct UninstallSheet: View {
             Divider()
             switch phase {
             case .loading:
-                ProgressView("Mencari file milik \(app.name)…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView(L("Finding files that belong to \(app.name)…", "Mencari file milik \(app.name)…")).frame(maxWidth: .infinity, maxHeight: .infinity)
             case .review:
                 review
             case .working:
                 VStack(spacing: 10) {
                     ProgressView()
-                    Text("Menghapus \(app.name)…")
-                    Text("Masukkan password admin jika diminta.").font(.caption).foregroundStyle(.secondary)
+                    Text(L("Removing \(app.name)…", "Menghapus \(app.name)…"))
+                    Text(L("Enter your admin password if prompted.", "Masukkan password admin jika diminta.")).font(.caption).foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .done(let r):
@@ -121,7 +122,7 @@ struct UninstallSheet: View {
         HStack(spacing: 14) {
             Image(nsImage: NSWorkspace.shared.icon(forFile: app.path)).resizable().frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Uninstall \(app.name)").font(.title2.weight(.semibold))
+                Text(L("Uninstall \(app.name)", "Uninstall \(app.name)")).font(.title2.weight(.semibold))
                 Text((app.path as NSString).abbreviatingWithTildeInPath)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
@@ -133,43 +134,53 @@ struct UninstallSheet: View {
     private var review: some View {
         let selected = items.filter { chosen.contains($0.id) }
         let adminCount = selected.filter(\.needsAdmin).count
+        let runningNames = running.compactMap(\.localizedName).joined(separator: ", ")
         return VStack(spacing: 0) {
             VStack(spacing: 8) {
                 if let official {
                     Notice(icon: "wrench.and.screwdriver", tint: .accentTeal,
-                           text: "\(app.name) punya uninstaller resmi. Sebaiknya jalankan itu dulu agar layanan latar belakangnya ikut dimatikan dengan benar, lalu bersihkan sisanya di sini.") {
-                        Button("Buka Uninstaller") { NSWorkspace.shared.open(URL(fileURLWithPath: official)) }
+                           text: L("\(app.name) has an official uninstaller. Run it first so its background services are shut down properly, then clean up whatever is left here.",
+                                   "\(app.name) punya uninstaller resmi. Sebaiknya jalankan itu dulu agar layanan latar belakangnya ikut dimatikan dengan benar, lalu bersihkan sisanya di sini.")) {
+                        Button(L("Open Uninstaller", "Buka Uninstaller")) { NSWorkspace.shared.open(URL(fileURLWithPath: official)) }
                     }
                 }
                 if !running.isEmpty {
                     Notice(icon: "exclamationmark.triangle.fill", tint: .orange,
-                           text: "\(running.compactMap(\.localizedName).joined(separator: ", ")) sedang berjalan dan akan diminta keluar. Jika masih terbuka (misalnya menunggu Anda menyimpan pekerjaan), uninstall dibatalkan.")
+                           text: L(running.count == 1
+                                ? "\(runningNames) is running and will be asked to quit. If it stays open (for example, waiting for you to save your work), the uninstall is cancelled."
+                                : "\(runningNames) are running and will be asked to quit. If any stay open (for example, waiting for you to save your work), the uninstall is cancelled.",
+                                "\(runningNames) sedang berjalan dan akan diminta keluar. Jika masih terbuka (misalnya menunggu Anda menyimpan pekerjaan), uninstall dibatalkan."))
                 }
             }
             .padding(.horizontal, 20).padding(.top, official != nil || !running.isEmpty ? 12 : 0)
 
             List {
-                section("Aplikasi", items.filter { $0.match == .app })
-                section("Sisa file", items.filter { $0.match == .sure })
-                section("Mungkin terkait", items.filter { $0.match == .maybe },
-                        note: "Nama mirip atau dari vendor yang sama. Bisa jadi dipakai aplikasi lain dari vendor ini, jadi tidak dicentang otomatis.")
+                section(L("App", "Aplikasi"), items.filter { $0.match == .app })
+                section(L("Leftover Files", "Sisa file"), items.filter { $0.match == .sure })
+                section(L("Possibly Related", "Mungkin terkait"), items.filter { $0.match == .maybe },
+                        note: L("Similar name or same vendor. Another app from this vendor may use these, so they are not selected automatically.",
+                                "Nama mirip atau dari vendor yang sama. Bisa jadi dipakai aplikasi lain dari vendor ini, jadi tidak dicentang otomatis."))
             }
             .listStyle(.inset)
 
             Divider()
             VStack(alignment: .leading, spacing: 8) {
                 if adminCount > 0 {
-                    Label("\(adminCount) item milik sistem: butuh password admin dan langsung dihapus permanen.",
+                    Label(L(adminCount == 1
+                              ? "1 system-owned item needs an admin password and is deleted permanently."
+                              : "\(adminCount) system-owned items need an admin password and are deleted permanently.",
+                              "\(adminCount) item milik sistem: butuh password admin dan langsung dihapus permanen."),
                           systemImage: "lock.fill")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
-                    Toggle("Hapus permanen (tidak lewat Sampah)", isOn: $permanent).toggleStyle(.checkbox)
+                    Toggle(L("Delete permanently (skip Trash)", "Hapus permanen (tidak lewat Sampah)"), isOn: $permanent).toggleStyle(.checkbox)
                     Spacer()
-                    Text("\(selected.count) item · \(Fmt.size(selected.reduce(0) { $0 + $1.size }))")
+                    Text(L("\(selected.count) \(selected.count == 1 ? "item" : "items") · \(Fmt.size(selected.reduce(0) { $0 + $1.size }))",
+                           "\(selected.count) item · \(Fmt.size(selected.reduce(0) { $0 + $1.size }))"))
                         .foregroundStyle(.secondary).monospacedDigit()
-                    Button("Batal") { dismiss() }.keyboardShortcut(.cancelAction)
-                    Button("Uninstall") { start(selected) }
+                    Button(L("Cancel", "Batal")) { dismiss() }.keyboardShortcut(.cancelAction)
+                    Button(L("Uninstall", "Uninstall")) { start(selected) }
                         .buttonStyle(.borderedProminent).tint(.red)
                         .disabled(selected.isEmpty)
                         .keyboardShortcut(.defaultAction)
@@ -189,7 +200,7 @@ struct UninstallSheet: View {
                     Text(title)
                     Spacer()
                     let all = rows.allSatisfy { chosen.contains($0.id) }
-                    Button(all ? "Batal Pilih" : "Pilih Semua") {
+                    Button(all ? L("Deselect All", "Batal Pilih") : L("Select All", "Pilih Semua")) {
                         if all { chosen.subtract(rows.map(\.id)) } else { chosen.formUnion(rows.map(\.id)) }
                     }
                     .buttonStyle(.link).font(.caption)
@@ -215,13 +226,13 @@ struct UninstallSheet: View {
                 Spacer()
                 if it.needsAdmin {
                     Image(systemName: "lock.fill").font(.caption).foregroundStyle(.secondary)
-                        .help("Milik sistem, butuh password admin")
+                        .help(L("System-owned, needs an admin password", "Milik sistem, butuh password admin"))
                 }
                 Text(Fmt.size(it.size)).monospacedDigit().foregroundStyle(.secondary)
             }
         }
         .toggleStyle(.checkbox)
-        .contextMenu { Button("Tampilkan di Finder") { model.reveal([it.path]) } }
+        .contextMenu { Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal([it.path]) } }
     }
 
     // MARK: result
@@ -231,9 +242,11 @@ struct UninstallSheet: View {
             Image(systemName: r.failed.isEmpty ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .font(.system(size: 40))
                 .foregroundStyle(r.failed.isEmpty ? Color.accentTeal : .orange)
-            Text(r.failed.isEmpty ? "\(app.name) sudah dihapus" : "Sebagian tidak bisa dihapus")
+            Text(r.failed.isEmpty ? L("\(app.name) has been removed", "\(app.name) sudah dihapus")
+                                   : L("Some items couldn't be removed", "Sebagian tidak bisa dihapus"))
                 .font(.title3.weight(.semibold))
-            Text("\(r.removed.count) item · \(Fmt.size(r.freed)) dibebaskan")
+            Text(L("\(r.removed.count) \(r.removed.count == 1 ? "item" : "items") · \(Fmt.size(r.freed)) freed",
+                   "\(r.removed.count) item · \(Fmt.size(r.freed)) dibebaskan"))
                 .foregroundStyle(.secondary)
             if !r.failed.isEmpty {
                 List(r.failed, id: \.path) { f in
@@ -244,7 +257,7 @@ struct UninstallSheet: View {
                 }
                 .listStyle(.bordered).frame(maxHeight: 200)
             }
-            Button("Tutup") { dismiss() }.keyboardShortcut(.defaultAction)
+            Button(L("Close", "Tutup")) { dismiss() }.keyboardShortcut(.defaultAction)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -276,7 +289,11 @@ struct UninstallSheet: View {
             } else {
                 // removing files under a running app can corrupt its data; touch nothing
                 let names = still.compactMap(\.localizedName).joined(separator: ", ")
-                r = DeleteResult(failed: selected.map { ($0.path, "\(names) masih berjalan. Simpan pekerjaan dan tutup aplikasinya, lalu coba lagi.") })
+                let reason = L(still.count == 1
+                                ? "\(names) is still running. Save your work and quit the app, then try again."
+                                : "\(names) are still running. Save your work and quit the apps, then try again.",
+                                "\(names) masih berjalan. Simpan pekerjaan dan tutup aplikasinya, lalu coba lagi.")
+                r = DeleteResult(failed: selected.map { ($0.path, reason) })
             }
             await MainActor.run {
                 model.uninstallFinished(r, items: selected)

@@ -26,20 +26,21 @@ struct DuplicatesView: View {
             case .done: results(visible)
             }
         }
-        .navigationTitle("File Duplikat")
+        .navigationTitle(L("Duplicate Files", "File Duplikat"))
         .navigationSubtitle(model.dupeState == .done
-                            ? "\(visible.count) grup · \(Fmt.size(visible.reduce(0) { $0 + $1.wasted })) bisa dihemat"
+                            ? L("\(visible.count == 1 ? "1 group" : "\(visible.count) groups") · \(Fmt.size(visible.reduce(0) { $0 + $1.wasted })) can be freed",
+                                "\(visible.count) grup · \(Fmt.size(visible.reduce(0) { $0 + $1.wasted })) bisa dihemat")
                             : "")
-        .searchable(text: $query, placement: .toolbar, prompt: "Cari nama file")
+        .searchable(text: $query, placement: .toolbar, prompt: L("Search file names", "Cari nama file"))
         .toolbar {
             ToolbarItem {
-                Picker("Minimal", selection: $minSize) {
+                Picker(L("Minimum", "Minimal"), selection: $minSize) {
                     Text("≥ 1 MB").tag(MB)
                     Text("≥ 10 MB").tag(10 * MB)
                     Text("≥ 100 MB").tag(100 * MB)
                     Text("≥ 1 GB").tag(GB)
                 }
-                .help("Ukuran minimal per file")
+                .help(L("Minimum size per file", "Ukuran minimal per file"))
                 .disabled(model.dupeState != .done)
             }
         }
@@ -47,20 +48,22 @@ struct DuplicatesView: View {
 
     private var idle: some View {
         @Bindable var model = model
+        let n = model.files.count
         return VStack(spacing: 18) {
             Circle()
                 .strokeBorder(Color.accentTeal.opacity(0.15), lineWidth: 10)
                 .frame(width: 148, height: 148)
                 .overlay(Image(systemName: "doc.on.doc").font(.system(size: 40)).foregroundStyle(.secondary))
-            Text("Cari file duplikat")
+            Text(L("Find Duplicate Files", "Cari file duplikat"))
                 .font(.system(size: 24, weight: .semibold))
-            Text("CleanBro membandingkan isi \(Fmt.count(Int64(model.files.count))) file berukuran ≥ 1 MB di \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath). Hanya file dengan ukuran sama yang dibaca, dan isinya dicocokkan byte demi byte lewat SHA-256.")
+            Text(L("CleanBro compares the contents of \(n == 1 ? "1 file" : "\(Fmt.count(Int64(n))) files") of 1 MB or larger in \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath). Only files of the same size are read, and their contents are matched byte by byte using SHA-256.",
+                   "CleanBro membandingkan isi \(Fmt.count(Int64(n))) file berukuran ≥ 1 MB di \((model.scanRoot.path as NSString).abbreviatingWithTildeInPath). Hanya file dengan ukuran sama yang dibaca, dan isinya dicocokkan byte demi byte lewat SHA-256."))
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 460)
-            Toggle("Lewati Library, folder sistem, paket aplikasi, dan pustaka Foto/Musik", isOn: $model.dupeSkipProtected)
+            Toggle(L("Skip Library, system folders, app packages, and Photos/Music libraries", "Lewati Library, folder sistem, paket aplikasi, dan pustaka Foto/Musik"), isOn: $model.dupeSkipProtected)
                 .toggleStyle(.checkbox).font(.system(size: 12))
-                .help("File di dalamnya sering sengaja kembar; menghapusnya bisa merusak aplikasi")
-            Button("Cari Duplikat") { model.startDupeScan() }
+                .help(L("Files inside are often duplicated on purpose; deleting them can break apps", "File di dalamnya sering sengaja kembar; menghapusnya bisa merusak aplikasi"))
+            Button(L("Find Duplicates", "Cari Duplikat")) { model.startDupeScan() }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .padding(.top, 6)
@@ -76,7 +79,8 @@ struct DuplicatesView: View {
             Text("\(Int(frac * 100))%")
                 .font(.system(size: 48, weight: .light)).monospacedDigit()
             ProgressView(value: frac).frame(width: 360)
-            Text("\(Fmt.count(Int64(p.done))) dari \(Fmt.count(Int64(p.total))) file dicek · \(Fmt.size(p.bytes)) dibaca")
+            Text(L("\(Fmt.count(Int64(p.done))) of \(p.total == 1 ? "1 file" : "\(Fmt.count(Int64(p.total))) files") checked · \(Fmt.size(p.bytes)) read",
+                   "\(Fmt.count(Int64(p.done))) dari \(Fmt.count(Int64(p.total))) file dicek · \(Fmt.size(p.bytes)) dibaca"))
                 .foregroundStyle(.secondary).monospacedDigit()
             Text((p.current as NSString).abbreviatingWithTildeInPath)
                 .font(.system(size: 12, design: .monospaced)).foregroundStyle(.tertiary)
@@ -90,7 +94,7 @@ struct DuplicatesView: View {
     private func results(_ visible: [DupeGroup]) -> some View {
         VStack(spacing: 0) {
             if model.dupePartial {
-                PartialBanner(text: "Pencarian dihentikan. Daftar ini hanya berisi grup yang sudah selesai dicocokkan.") {
+                PartialBanner(text: L("Search stopped. This list only contains groups that have finished matching.", "Pencarian dihentikan. Daftar ini hanya berisi grup yang sudah selesai dicocokkan.")) {
                     model.startDupeScan()
                 }
                 .padding(.horizontal, 20).padding(.vertical, 8)
@@ -98,8 +102,8 @@ struct DuplicatesView: View {
             }
             if visible.isEmpty {
                 EmptyRows(text: model.dupes.isEmpty
-                          ? "Tidak ada file duplikat. 🎉"
-                          : "Tidak ada duplikat yang cocok dengan filter ini.")
+                          ? L("No duplicate files. 🎉", "Tidak ada file duplikat. 🎉")
+                          : L("No duplicates match this filter.", "Tidak ada duplikat yang cocok dengan filter ini."))
             } else {
                 List {
                     ForEach(visible) { g in
@@ -124,9 +128,9 @@ private struct DupeHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(group.items.first?.name ?? "").fontWeight(.semibold).lineLimit(1).truncationMode(.middle)
-            Text("\(group.items.count) salinan × \(Fmt.size(group.size))").foregroundStyle(.secondary)
+            Text(L("\(group.items.count) copies × \(Fmt.size(group.size))", "\(group.items.count) salinan × \(Fmt.size(group.size))")).foregroundStyle(.secondary)
             Spacer()
-            Text("hemat \(Fmt.size(group.wasted))").foregroundStyle(Color.accentTeal).monospacedDigit()
+            Text(L("saves \(Fmt.size(group.wasted))", "hemat \(Fmt.size(group.wasted))")).foregroundStyle(Color.accentTeal).monospacedDigit()
         }
         .font(.system(size: 12))
     }
@@ -157,7 +161,7 @@ private struct DupeRow: View {
             }
             Spacer()
             if item.id == group.items.first?.id {
-                Text("Terlama").font(.caption2).foregroundStyle(.secondary)
+                Text(L("Oldest", "Terlama")).font(.caption2).foregroundStyle(.secondary)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .overlay(Capsule().strokeBorder(.quaternary))
             }
@@ -168,8 +172,8 @@ private struct DupeRow: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { model.reveal([item.path]) }
         .contextMenu {
-            Button("Tampilkan di Finder") { model.reveal([item.path]) }
-            Button("Simpan yang Ini Saja") {
+            Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal([item.path]) }
+            Button(L("Keep Only This One", "Simpan yang Ini Saja")) {
                 marked.formUnion(group.items.map(\.id))
                 marked.remove(item.id)
             }
@@ -190,29 +194,29 @@ private struct DupeBar: View {
         let wiped = groups.filter { g in g.items.allSatisfy { marked.contains($0.id) } }.count
 
         HStack(spacing: 10) {
-            Text("\(chosen.count) dipilih")
+            Text(L("\(chosen.count) selected", "\(chosen.count) dipilih"))
             if !chosen.isEmpty { Text(Fmt.size(total)).foregroundStyle(.secondary).monospacedDigit() }
-            Menu("Pilih Otomatis") {
-                Button("Sisakan yang terlama") { keepOne { $0.modified < $1.modified } }
-                Button("Sisakan yang terbaru") { keepOne { $0.modified > $1.modified } }
-                Button("Sisakan jalur terpendek") { keepOne { $0.path.count < $1.path.count } }
+            Menu(L("Auto-Select", "Pilih Otomatis")) {
+                Button(L("Keep Oldest", "Sisakan yang terlama")) { keepOne { $0.modified < $1.modified } }
+                Button(L("Keep Newest", "Sisakan yang terbaru")) { keepOne { $0.modified > $1.modified } }
+                Button(L("Keep Shortest Path", "Sisakan jalur terpendek")) { keepOne { $0.path.count < $1.path.count } }
                 Divider()
-                Button("Hapus Semua Centang") { marked.subtract(groups.flatMap(\.items).map(\.id)) }
+                Button(L("Uncheck All", "Hapus Semua Centang")) { marked.subtract(groups.flatMap(\.items).map(\.id)) }
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
             .disabled(groups.isEmpty)
             if wiped > 0 {
-                Label("Semua salinan di \(wiped) grup tercentang", systemImage: "exclamationmark.triangle.fill")
+                Label(L("All copies checked in \(wiped == 1 ? "1 group" : "\(wiped) groups")", "Semua salinan di \(wiped) grup tercentang"), systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                    .help("Tidak ada salinan yang tersisa untuk grup ini setelah dihapus")
+                    .help(L(wiped == 1 ? "No copy of this group will remain after deletion" : "No copy of these groups will remain after deletion", "Tidak ada salinan yang tersisa untuk grup ini setelah dihapus"))
             }
             Spacer()
-            Button("Pindai Ulang") { model.startDupeScan() }
+            Button(L("Rescan", "Pindai Ulang")) { model.startDupeScan() }
             Button {
                 model.requestDelete(chosen, from: .dupes)
             } label: {
-                Label("Hapus…", systemImage: "trash")
+                Label(L("Delete…", "Hapus…"), systemImage: "trash")
             }
             .buttonStyle(.borderedProminent)
             .tint(.red)

@@ -30,7 +30,7 @@ struct UninstallItem: Identifiable, Hashable {
 
     /// "Application Support", "Launch Daemon", …
     var kind: String {
-        if match == .app { return "Aplikasi" }
+        if match == .app { return L("App", "Aplikasi") }
         let parent = ((path as NSString).deletingLastPathComponent as NSString).lastPathComponent
         switch parent {
         case "LaunchAgents": return "Launch Agent"
@@ -262,7 +262,7 @@ enum AppUninstaller {
         var r = DeleteResult()
         var admin: [UninstallItem] = []
         for it in items {
-            guard isAllowedTarget(it.path) else { r.failed.append((it.path, "Dilindungi")); continue }
+            guard isAllowedTarget(it.path) else { r.failed.append((it.path, L("Protected", "Dilindungi"))); continue }
             if it.needsAdmin { admin.append(it); continue }
             if isLaunchPlist(it.path) { launchctl(["bootout", "gui/\(getuid())", it.path]) }
             let one = DeepCleaner.delete([(it.path, it.size)], mode: mode)
@@ -273,7 +273,8 @@ enum AppUninstaller {
                 admin.append(it)    // e.g. a root-owned file deep inside a user folder
             } else {
                 // the user asked for the Trash: don't fall back to an unrecoverable rm -rf
-                r.failed += one.failed.map { ($0.path, "Tidak bisa dipindahkan ke Sampah (\($0.reason)). Centang Hapus permanen untuk menghapusnya dengan password admin.") }
+                r.failed += one.failed.map { ($0.path, L("Couldn't be moved to the Trash (\($0.reason)). Turn on \"Delete permanently\" to remove it with an admin password.",
+                                              "Tidak bisa dipindahkan ke Sampah (\($0.reason)). Centang Hapus permanen untuk menghapusnya dengan password admin.")) }
             }
         }
         if !admin.isEmpty { removeAsAdmin(admin, into: &r) }
@@ -298,12 +299,12 @@ enum AppUninstaller {
         let err = Pipe()
         proc.standardError = err
         proc.standardOutput = Pipe()
-        var reason = "Gagal dijalankan"
+        var reason = L("Failed to run", "Gagal dijalankan")
         do {
             try proc.run()
             proc.waitUntilExit()
             let msg = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            if msg.contains("-128") { reason = "Password admin dibatalkan" }
+            if msg.contains("-128") { reason = L("Admin password cancelled", "Password admin dibatalkan") }
             else if !msg.isEmpty { reason = msg.trimmingCharacters(in: .whitespacesAndNewlines) }
         } catch {}
 

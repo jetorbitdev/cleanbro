@@ -12,7 +12,7 @@ struct CleanView: View {
             case .finished: finished
             }
         }
-        .navigationTitle("Pembersihan")
+        .navigationTitle(L("Cleanup", "Pembersihan"))
     }
 
     private var idle: some View {
@@ -20,13 +20,14 @@ struct CleanView: View {
             Circle()
                 .strokeBorder(Color.accentTeal.opacity(0.15), lineWidth: 10)
                 .frame(width: 148, height: 148)
-                .overlay(Text("Siap").foregroundStyle(.secondary))
-            Text("Temukan file sampah di Mac Anda")
+                .overlay(Text(L("Ready", "Siap")).foregroundStyle(.secondary))
+            Text(L("Find junk files on your Mac", "Temukan file sampah di Mac Anda"))
                 .font(.system(size: 24, weight: .semibold))
-            Text("Cache, log, data developer, sisa unduhan, dan isi Sampah akan dipindai. Tidak ada yang dihapus sebelum Anda konfirmasi.")
+            Text(L("Caches, logs, developer data, leftover downloads, and Trash contents will be scanned. Nothing is deleted until you confirm.",
+                   "Cache, log, data developer, sisa unduhan, dan isi Sampah akan dipindai. Tidak ada yang dihapus sebelum Anda konfirmasi."))
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 420)
-            Button("Pindai") { model.startJunkScan() }
+            Button(L("Scan", "Pindai")) { model.startJunkScan() }
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .padding(.top, 6)
@@ -56,13 +57,14 @@ struct CleanView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(Fmt.size(model.junkSelectedSize))
                     .font(.system(size: 32, weight: .semibold)).monospacedDigit()
-                Text("bisa dibersihkan").foregroundStyle(.secondary)
+                Text(L("can be cleaned up", "bisa dibersihkan")).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.horizontal, 28).padding(.top, 24).padding(.bottom, 12)
 
             if model.junkPartial {
-                PartialBanner(text: "Pemindaian dihentikan. Daftar ini hanya berisi item yang sudah selesai diukur.") {
+                PartialBanner(text: L("Scan stopped. This list only contains items that were fully measured.",
+                                      "Pemindaian dihentikan. Daftar ini hanya berisi item yang sudah selesai diukur.")) {
                     model.startJunkScan()
                 }
                 .padding(.horizontal, 28).padding(.bottom, 8)
@@ -77,9 +79,9 @@ struct CleanView: View {
 
             Divider()
             HStack(spacing: 10) {
-                Button("Pindai Ulang") { model.startJunkScan() }
+                Button(L("Rescan", "Pindai Ulang")) { model.startJunkScan() }
                 Spacer()
-                Button("Bersihkan \(Fmt.size(model.junkSelectedSize))") { model.requestJunkClean() }
+                Button(L("Clean \(Fmt.size(model.junkSelectedSize))", "Bersihkan \(Fmt.size(model.junkSelectedSize))")) { model.requestJunkClean() }
                     .buttonStyle(.borderedProminent)
                     .disabled(model.junkSelectedSize == 0)
                     .keyboardShortcut(.defaultAction)
@@ -93,15 +95,25 @@ struct CleanView: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 44)).foregroundStyle(Color.accentTeal)
-            Text("Selesai").font(.headline).foregroundStyle(Color.accentTeal)
-            Text("\(Fmt.size(model.freed)) \(model.lastDeleteMode == .trash ? "dipindahkan ke Sampah" : "dikosongkan")")
+            Text(L("Done", "Selesai")).font(.headline).foregroundStyle(Color.accentTeal)
+            Text(model.lastDeleteMode == .trash
+                 ? L("\(Fmt.size(model.freed)) moved to Trash", "\(Fmt.size(model.freed)) dipindahkan ke Sampah")
+                 : L("\(Fmt.size(model.freed)) freed", "\(Fmt.size(model.freed)) dikosongkan"))
                 .font(.system(size: 28, weight: .semibold))
             Text(model.lastDeleteMode == .trash
-                 ? "File bisa dipulihkan dari Sampah. Kosongkan Sampah untuk membebaskan ruang disk."
-                 : "File dihapus permanen (deep clean), tanpa melewati Sampah.")
+                 ? L("Files can be restored from the Trash. Empty the Trash to free up disk space.",
+                     "File bisa dipulihkan dari Sampah. Kosongkan Sampah untuk membebaskan ruang disk.")
+                 : L("Files were permanently deleted (Deep Clean), bypassing the Trash.",
+                     "File dihapus permanen (deep clean), tanpa melewati Sampah."))
                 .foregroundStyle(.secondary)
             if !model.lastKept.isEmpty {
-                Label("\(model.lastKept.count) item (\(Fmt.size(model.lastKept.reduce(0) { $0 + $1.size }))) sudah ada di Sampah dan dibiarkan. Kosongkan Sampah untuk menghapusnya permanen.",
+                let keptCount = model.lastKept.count
+                let keptSize = Fmt.size(model.lastKept.reduce(0) { $0 + $1.size })
+                Label(keptCount == 1
+                      ? L("1 item (\(keptSize)) is already in the Trash and was left alone. Empty the Trash to delete it permanently.",
+                          "\(keptCount) item (\(keptSize)) sudah ada di Sampah dan dibiarkan. Kosongkan Sampah untuk menghapusnya permanen.")
+                      : L("\(keptCount) items (\(keptSize)) are already in the Trash and were left alone. Empty the Trash to delete them permanently.",
+                          "\(keptCount) item (\(keptSize)) sudah ada di Sampah dan dibiarkan. Kosongkan Sampah untuk menghapusnya permanen."),
                       systemImage: "info.circle")
                     .font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: 520)
@@ -110,9 +122,9 @@ struct CleanView: View {
                 FailureList(failures: model.lastFailures).frame(maxWidth: 520)
             }
             HStack {
-                Button("Kembali") { model.cleanPhase = .idle }
+                Button(L("Back", "Kembali")) { model.cleanPhase = .idle }
                 if model.lastDeleteMode == .trash, (model.trashCount ?? 0) > 0 {
-                    Button("Kosongkan Sampah…") { model.requestEmptyTrash() }
+                    Button(L("Empty Trash…", "Kosongkan Sampah…")) { model.requestEmptyTrash() }
                 }
             }
             .padding(.top, 10)
@@ -149,7 +161,7 @@ struct JunkCategoryRow: View {
                 }
                 Spacer()
                 if category.note != nil {
-                    Button("Beri Akses…") { model.askFullDiskAccess = true }
+                    Button(L("Grant Access…", "Beri Akses…")) { model.askFullDiskAccess = true }
                         .controlSize(.small)
                 }
                 if !selected.isEmpty && !all {
@@ -185,11 +197,14 @@ struct JunkCategoryRow: View {
                         .font(.system(size: 12))
                         .padding(.vertical, 4)
                         .contextMenu {
-                            Button("Tampilkan di Finder") { model.reveal([item.path]) }
+                            Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal([item.path]) }
                         }
                     }
                     if category.items.count > 300 {
-                        Text("… dan \(category.items.count - 300) item lainnya")
+                        let more = category.items.count - 300
+                        Text(more == 1
+                             ? L("… and 1 more item", "… dan \(more) item lainnya")
+                             : L("… and \(more) more items", "… dan \(more) item lainnya"))
                             .font(.caption).foregroundStyle(.secondary).padding(.vertical, 4)
                     }
                 }
@@ -203,7 +218,9 @@ struct JunkCategoryRow: View {
 struct FailureList: View {
     let failures: [(path: String, reason: String)]
     var body: some View {
-        DisclosureGroup("\(failures.count) item tidak bisa dihapus") {
+        DisclosureGroup(failures.count == 1
+                        ? L("1 item couldn't be deleted", "\(failures.count) item tidak bisa dihapus")
+                        : L("\(failures.count) items couldn't be deleted", "\(failures.count) item tidak bisa dihapus")) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(failures.prefix(100).enumerated()), id: \.offset) { _, f in

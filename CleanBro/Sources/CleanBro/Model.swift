@@ -10,14 +10,14 @@ enum FileKind: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .folder: "Folder"
-        case .app: "Aplikasi"
+        case .app: L("Apps", "Aplikasi")
         case .video: "Video"
-        case .archive: "Arsip & Installer"
+        case .archive: L("Archives & Installers", "Arsip & Installer")
         case .disk: "Disk Image"
-        case .image: "Gambar"
+        case .image: L("Images", "Gambar")
         case .audio: "Audio"
-        case .document: "Dokumen"
-        case .other: "Lainnya"
+        case .document: L("Documents", "Dokumen")
+        case .other: L("Other", "Lainnya")
         }
     }
 
@@ -90,7 +90,7 @@ struct Item: Identifiable, Hashable {
 // MARK: - App state
 
 enum Tool: String, Hashable, CaseIterable {
-    case clean, apps, usage, large, stale, dupes
+    case home, clean, apps, usage, large, stale, dupes
 }
 
 struct PendingDelete: Identifiable {
@@ -105,7 +105,7 @@ struct PendingDelete: Identifiable {
 @Observable
 @MainActor
 final class AppModel {
-    var tool: Tool = .clean
+    var tool: Tool = .home
 
     // volume
     var volumeName = "Macintosh HD"
@@ -254,7 +254,7 @@ final class AppModel {
                     self.askFullDiskAccess = true
                     return
                 }
-                guard !items.isEmpty else { self.flash("Sampah sudah kosong"); return }
+                guard !items.isEmpty else { self.flash(L("Trash is already empty", "Sampah sudah kosong")); return }
                 self.pendingDelete = PendingDelete(tool: self.tool, items: items, emptiesTrash: true)
             }
         }
@@ -304,7 +304,8 @@ final class AppModel {
             guard !alwaysSkip.contains(path) else { return }
             alwaysSkip.append(path)
             alwaysSkip.sort()
-            flash("\((path as NSString).lastPathComponent) akan selalu dilewati")
+            let name = (path as NSString).lastPathComponent
+            flash(L("\(name) will always be skipped", "\(name) akan selalu dilewati"))
         } else {
             alwaysSkip.removeAll { $0 == path }
         }
@@ -322,8 +323,8 @@ final class AppModel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = true
         panel.showsHiddenFiles = true
-        panel.prompt = "Tambahkan"
-        panel.message = "Pilih folder yang selalu dilewati saat memindai"
+        panel.prompt = L("Add", "Tambahkan")
+        panel.message = L("Choose folders to always skip when scanning", "Pilih folder yang selalu dilewati saat memindai")
         if panel.runModal() == .OK {
             for url in panel.urls { setAlwaysSkip(url.path, true) }
         }
@@ -386,8 +387,8 @@ final class AppModel {
         // ~/Library and dot-folders are hidden by macOS; show them so they can be picked
         panel.showsHiddenFiles = true
         panel.directoryURL = scanRoot
-        panel.prompt = "Pindai"
-        panel.message = "Pilih folder atau volume yang ingin dianalisis"
+        panel.prompt = L("Scan", "Pindai")
+        panel.message = L("Choose a folder or volume to analyze", "Pilih folder atau volume yang ingin dianalisis")
         if panel.runModal() == .OK, let url = panel.url {
             scanRoot = url
             startAnalysis()
@@ -395,12 +396,12 @@ final class AppModel {
     }
 
     /// Quick picks for folders that are awkward to reach in the open panel.
-    static let presets: [(title: String, icon: String, path: String)] = [
+    static var presets: [(title: String, icon: String, path: String)] { [
         ("Home", "house", NSHomeDirectory()),
         ("Library", "building.columns", NSHomeDirectory() + "/Library"),
-        ("Aplikasi", "app.badge", "/Applications"),
+        (L("Applications", "Aplikasi"), "app.badge", "/Applications"),
         ("Macintosh HD", "internaldrive", "/"),
-    ]
+    ] }
 
     func scan(path: String) {
         scanRoot = URL(fileURLWithPath: path)
@@ -432,7 +433,7 @@ final class AppModel {
                     self.skippedFolders = skipped.sorted { $0.path < $1.path }
                     self.scanDuration = elapsed
                     self.scanState = .done
-                    self.marks[.usage] = []; self.marks[.large] = []; self.marks[.stale] = []
+                    self.marks[.home] = []; self.marks[.usage] = []; self.marks[.large] = []; self.marks[.stale] = []
                     self.revision += 1
                 }
             }
@@ -463,6 +464,16 @@ final class AppModel {
             let up = (p as NSString).deletingLastPathComponent
             if up == p || up.isEmpty { return nil }
             p = up
+        }
+    }
+
+    /// Used space on the volume (what macOS counts, purgeable space excluded).
+    var volumeUsed: Int64 { max(0, volumeTotal - volumeFree) }
+
+    /// Number and total size of files of at least 100 MB in the analysis.
+    var largeFileStats: (count: Int, size: Int64) {
+        files.reduce(into: (0, Int64(0))) { acc, f in
+            if f.size >= 100 << 20 { acc.0 += 1; acc.1 += f.size }
         }
     }
 
@@ -580,8 +591,9 @@ final class AppModel {
         applyRemoved(r, sizes: pending.items)
 
         if pending.emptiesTrash {
-            var msg = "Sampah dikosongkan · \(Fmt.size(r.freed)) dibebaskan"
-            if !r.failed.isEmpty { msg += " · \(r.failed.count) gagal" }
+            let size = Fmt.size(r.freed)
+            var msg = L("Trash emptied · \(size) freed", "Sampah dikosongkan · \(size) dibebaskan")
+            if !r.failed.isEmpty { msg += L(" · \(r.failed.count) failed", " · \(r.failed.count) gagal") }
             flash(msg)
         } else if pending.tool == .clean {
             freed = r.freed
@@ -589,10 +601,10 @@ final class AppModel {
             lastKept = r.kept
             cleanPhase = .finished
         } else {
-            let verb = mode == .trash ? "dipindahkan ke Sampah" : "dihapus permanen"
+            let verb = mode == .trash ? L("moved to Trash", "dipindahkan ke Sampah") : L("deleted permanently", "dihapus permanen")
             var msg = "\(Fmt.size(r.freed)) \(verb)"
-            if !r.kept.isEmpty { msg += " · \(r.kept.count) sudah di Sampah, dibiarkan" }
-            if !r.failed.isEmpty { msg += " · \(r.failed.count) gagal" }
+            if !r.kept.isEmpty { msg += L(" · \(r.kept.count) already in Trash, left in place", " · \(r.kept.count) sudah di Sampah, dibiarkan") }
+            if !r.failed.isEmpty { msg += L(" · \(r.failed.count) failed", " · \(r.failed.count) gagal") }
             flash(msg)
         }
     }
@@ -620,7 +632,7 @@ final class AppModel {
                 return a
             }
             await MainActor.run {
-                if let app { self.uninstallTarget = app } else { self.flash("Bukan aplikasi yang bisa di-uninstall") }
+                if let app { self.uninstallTarget = app } else { self.flash(L("This isn't an app that can be uninstalled", "Bukan aplikasi yang bisa di-uninstall")) }
             }
         }
     }
@@ -697,25 +709,31 @@ enum Fmt {
     }
 
     static func count(_ n: Int64) -> String {
-        n.formatted(.number.locale(Locale(identifier: "id_ID")))
+        n.formatted(.number.locale(AppLanguage.current.locale))
     }
 
     private static let dateF: DateFormatter = {
         let f = DateFormatter()
-        f.locale = Locale(identifier: "id_ID")
         f.dateFormat = "d MMM yyyy"
         return f
     }()
 
     private static let relF: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "id_ID")
         f.unitsStyle = .full
         return f
     }()
 
-    static func date(_ d: Date) -> String { d == .distantPast ? "—" : dateF.string(from: d) }
-    static func relative(_ d: Date) -> String { d == .distantPast ? "" : relF.localizedString(for: d, relativeTo: Date()) }
+    static func date(_ d: Date) -> String {
+        guard d != .distantPast else { return "—" }
+        dateF.locale = AppLanguage.current.locale
+        return dateF.string(from: d)
+    }
+    static func relative(_ d: Date) -> String {
+        guard d != .distantPast else { return "" }
+        relF.locale = AppLanguage.current.locale
+        return relF.localizedString(for: d, relativeTo: Date())
+    }
 }
 
 extension Color {

@@ -24,7 +24,7 @@ struct DiskUsageView: View {
                 Divider()
             }
             if rows.isEmpty {
-                EmptyRows(text: "Folder ini kosong atau isinya kecil semua.")
+                EmptyRows(text: L("This folder is empty or everything in it is small.", "Folder ini kosong atau isinya kecil semua."))
             } else {
                 ItemTable(items: rows, marked: model.marks(for: .usage), sortOrder: $sortOrder) { item in
                     currentPath = item.path
@@ -32,8 +32,11 @@ struct DiskUsageView: View {
             }
             SelectionBar(visible: rows, marked: model.marks(for: .usage))
         }
-        .navigationTitle("Penggunaan Disk")
-        .navigationSubtitle(node.map { "\(Fmt.size($0.size)) · \(Fmt.count($0.fileCount)) file" } ?? "")
+        .navigationTitle(L("Disk Usage", "Penggunaan Disk"))
+        .navigationSubtitle(node.map {
+            L("\(Fmt.size($0.size)) · \(Fmt.count($0.fileCount)) \($0.fileCount == 1 ? "file" : "files")",
+              "\(Fmt.size($0.size)) · \(Fmt.count($0.fileCount)) file")
+        } ?? "")
         .toolbar {
             ToolbarItem { SortMenu(sortOrder: $sortOrder) }
         }
@@ -81,17 +84,20 @@ struct DiskUsageView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text((node.complete ? "" : "≥ ") + Fmt.size(node.size)).font(.system(size: 26, weight: .semibold)).monospacedDigit()
                 if node.parent != nil {
-                    Text(String(format: "%.1f%% dari folder induk", frac * 100)).foregroundStyle(.secondary)
+                    Text(String(format: L("%.1f%% of parent folder", "%.1f%% dari folder induk"), frac * 100)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text("Terakhir berubah \(Fmt.relative(node.modified))").font(.caption).foregroundStyle(.secondary)
+                Text(L("Last modified \(Fmt.relative(node.modified))", "Terakhir berubah \(Fmt.relative(node.modified))")).font(.caption).foregroundStyle(.secondary)
             }
             if model.progress.errors > 0 && node.parent == nil {
                 HStack(spacing: 8) {
-                    Label("\(Fmt.count(model.progress.errors)) item tidak bisa dibaca. Beri CleanBro izin Full Disk Access di Pengaturan Sistem › Privasi & Keamanan.",
+                    Label(L(model.progress.errors == 1
+                              ? "1 item couldn't be read. Grant CleanBro Full Disk Access in System Settings › Privacy & Security."
+                              : "\(Fmt.count(model.progress.errors)) items couldn't be read. Grant CleanBro Full Disk Access in System Settings › Privacy & Security.",
+                              "\(Fmt.count(model.progress.errors)) item tidak bisa dibaca. Beri CleanBro izin Full Disk Access di Pengaturan Sistem › Privasi & Keamanan."),
                           systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.orange)
-                    Button("Beri Akses…") { model.askFullDiskAccess = true }
+                    Button(L("Grant Access…", "Beri Akses…")) { model.askFullDiskAccess = true }
                         .controlSize(.small)
                 }
             }
@@ -117,32 +123,33 @@ struct LargeFilesView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(kinds, id: \.self) { k in
-                        Chip(title: k?.label ?? "Semua", on: kind == k) { kind = k }
+                        Chip(title: k?.label ?? L("All", "Semua"), on: kind == k) { kind = k }
                     }
                 }
                 .padding(.horizontal, 20).padding(.vertical, 10)
             }
             Divider()
             if rows.isEmpty {
-                EmptyRows(text: "Tidak ada file yang cocok dengan filter ini.")
+                EmptyRows(text: L("No files match this filter.", "Tidak ada file yang cocok dengan filter ini."))
             } else {
                 ItemTable(items: rows, marked: model.marks(for: .large), sortOrder: $sortOrder)
             }
             SelectionBar(visible: rows, marked: model.marks(for: .large))
         }
-        .navigationTitle("File Besar")
-        .navigationSubtitle("\(rows.count) file · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))")
-        .searchable(text: $query, placement: .toolbar, prompt: "Cari nama file")
+        .navigationTitle(L("Large Files", "File Besar"))
+        .navigationSubtitle(L("\(rows.count) \(rows.count == 1 ? "file" : "files") · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))",
+                              "\(rows.count) file · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))"))
+        .searchable(text: $query, placement: .toolbar, prompt: L("Search file names", "Cari nama file"))
         .toolbar {
             ToolbarItem {
-                Picker("Minimal", selection: $minSize) {
+                Picker(L("Minimum", "Minimal"), selection: $minSize) {
                     Text("50 MB").tag(50 * MB)
                     Text("100 MB").tag(100 * MB)
                     Text("500 MB").tag(500 * MB)
                     Text("1 GB").tag(GB)
                 }
                 .pickerStyle(.segmented)
-                .help("Ukuran minimal")
+                .help(L("Minimum size", "Ukuran minimal"))
             }
             ToolbarItem { SortMenu(sortOrder: $sortOrder) }
         }
@@ -164,17 +171,26 @@ struct StaleView: View {
         var id: Int { rawValue }
         var label: String {
             switch self {
-            case .m6: "> 6 bulan"
-            case .y1: "> 1 tahun"
-            case .y2: "> 2 tahun"
-            case .y3: "> 3 tahun"
-            case .y5: "> 5 tahun"
+            case .m6: L("> 6 months", "> 6 bulan")
+            case .y1: L("> 1 year", "> 1 tahun")
+            case .y2: L("> 2 years", "> 2 tahun")
+            case .y3: L("> 3 years", "> 3 tahun")
+            case .y5: L("> 5 years", "> 5 tahun")
             }
         }
         var cutoff: Date { Calendar.current.date(byAdding: .month, value: -rawValue, to: Date()) ?? Date() }
     }
 
-    enum Show: String, CaseIterable { case all = "Semua", files = "File", folders = "Folder" }
+    enum Show: CaseIterable {
+        case all, files, folders
+        var label: String {
+            switch self {
+            case .all: L("All", "Semua")
+            case .files: L("Files", "File")
+            case .folders: L("Folders", "Folder")
+            }
+        }
+    }
 
     @StateVar private var age: Age = .y1
     @StateVar private var show: Show = .all
@@ -189,47 +205,48 @@ struct StaleView: View {
             HStack(spacing: 12) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
-                        Text("Tidak diubah").font(.system(size: 12)).foregroundStyle(.secondary)
+                        Text(L("Not modified", "Tidak diubah")).font(.system(size: 12)).foregroundStyle(.secondary)
                         ForEach(Age.allCases) { a in
                             Chip(title: a.label, on: age == a) { age = a }
                         }
                     }
                     .padding(.leading, 20)
                 }
-                Toggle("Lewati ~/Library", isOn: $skipLibrary)
+                Toggle(L("Skip ~/Library", "Lewati ~/Library"), isOn: $skipLibrary)
                     .toggleStyle(.checkbox).font(.system(size: 12))
                     .fixedSize()
-                    .help("Folder Library berisi data aplikasi yang jarang berubah tapi masih dipakai")
+                    .help(L("The Library folder holds app data that rarely changes but is still in use", "Folder Library berisi data aplikasi yang jarang berubah tapi masih dipakai"))
                     .padding(.trailing, 20)
             }
             .padding(.vertical, 10)
             Divider()
             if rows.isEmpty {
-                EmptyRows(text: "Tidak ada file atau folder yang lama tak berubah dengan filter ini.")
+                EmptyRows(text: L("No long-unmodified files or folders match this filter.", "Tidak ada file atau folder yang lama tak berubah dengan filter ini."))
             } else {
                 ItemTable(items: rows, marked: model.marks(for: .stale), sortOrder: $sortOrder,
                           showRelativeDate: true)
             }
             SelectionBar(visible: rows, marked: model.marks(for: .stale))
         }
-        .navigationTitle("Lama Tak Diubah")
-        .navigationSubtitle("\(rows.count) item · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))")
-        .searchable(text: $query, placement: .toolbar, prompt: "Cari nama")
+        .navigationTitle(L("Not Modified Lately", "Lama Tak Diubah"))
+        .navigationSubtitle(L("\(rows.count) \(rows.count == 1 ? "item" : "items") · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))",
+                              "\(rows.count) item · \(Fmt.size(rows.reduce(0) { $0 + $1.size }))"))
+        .searchable(text: $query, placement: .toolbar, prompt: L("Search names", "Cari nama"))
         .toolbar {
             ToolbarItem {
-                Picker("Tampilkan", selection: $show) {
-                    ForEach(Show.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                Picker(L("Show", "Tampilkan"), selection: $show) {
+                    ForEach(Show.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
             }
             ToolbarItem {
-                Picker("Minimal", selection: $minSize) {
+                Picker(L("Minimum", "Minimal"), selection: $minSize) {
                     Text("≥ 1 MB").tag(MB)
                     Text("≥ 10 MB").tag(10 * MB)
                     Text("≥ 100 MB").tag(100 * MB)
                     Text("≥ 1 GB").tag(GB)
                 }
-                .help("Ukuran minimal")
+                .help(L("Minimum size", "Ukuran minimal"))
             }
             ToolbarItem { SortMenu(sortOrder: $sortOrder) }
         }
