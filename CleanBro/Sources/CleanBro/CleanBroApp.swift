@@ -73,7 +73,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             Sidebar()
-                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
+                .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 300)
         } detail: {
             Group {
                 switch model.tool {
@@ -89,7 +89,10 @@ struct ContentView: View {
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .clipped()
+            .background(Theme.canvas.ignoresSafeArea())
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .background(SplitDividerFix())
         .overlay(alignment: .bottom) { ToastView() }
         .overlay { if model.isDeleting { DeletingOverlay() } }
         .overlay { if let busy = model.brewBusy { BrewBusyOverlay(text: busy) } }
@@ -113,39 +116,111 @@ struct Sidebar: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let selection = Binding<Tool?>(get: { model.tool }, set: { if let t = $0 { model.tool = t } })
-        List(selection: selection) {
-            Section(L("Tools", "Alat")) {
+        VStack(spacing: 0) {
+            SidebarBrand()
+            List {
                 row(.home, L("Home", "Beranda"), "house", "")
-                row(.clean, L("Cleanup", "Pembersihan"), "sparkles",
-                    model.cleanPhase == .done ? Fmt.size(model.junkSelectedSize) : "")
-                row(.apps, L("Uninstall Apps", "Uninstall Aplikasi"), "trash.square",
-                    model.apps.isEmpty ? "" : String(model.apps.count))
-                row(.brew, "Homebrew", "mug",
-                    model.brewPackages.isEmpty ? "" : String(model.brewPackages.count))
+
+                Section {
+                    row(.clean, L("Junk Files", "File Sampah"), "sparkles",
+                        model.cleanPhase == .done ? Fmt.size(model.junkSelectedSize) : "")
+                    row(.apps, L("Uninstall Apps", "Uninstall Aplikasi"), "square.grid.2x2",
+                        model.apps.isEmpty ? "" : String(model.apps.count))
+                    row(.brew, "Homebrew", "mug",
+                        model.brewPackages.isEmpty ? "" : String(model.brewPackages.count))
+                } header: { header(L("Clean Up", "Bersihkan")) }
+                Section {
+                    row(.usage, L("Disk Usage", "Penggunaan Disk"), "chart.pie",
+                        model.tree.map { Fmt.size($0.size) } ?? "")
+                    row(.large, L("Large Files", "File Besar"), "doc.badge.arrow.up",
+                        model.tree == nil ? "" : String(model.largeFileStats.count))
+                    row(.stale, L("Not Modified Lately", "Lama Tak Diubah"), "clock.arrow.circlepath", "")
+                    row(.dupes, L("Duplicate Files", "File Duplikat"), "doc.on.doc",
+                        model.dupeState == .done ? Fmt.size(model.dupeWasted) : "")
+                } header: { header(L("Analysis", "Analisis")) }
             }
-            Section(L("Analysis", "Analisis")) {
-                row(.usage, L("Disk Usage", "Penggunaan Disk"), "chart.bar.doc.horizontal",
-                    model.tree.map { Fmt.size($0.size) } ?? "")
-                row(.large, L("Large Files", "File Besar"), "doc.badge.arrow.up",
-                    model.tree == nil ? "" : String(model.largeFileStats.count))
-                row(.stale, L("Not Modified Lately", "Lama Tak Diubah"), "clock.arrow.circlepath", "")
-                row(.dupes, L("Duplicate Files", "File Duplikat"), "doc.on.doc",
-                    model.dupeState == .done ? Fmt.size(model.dupeWasted) : "")
-            }
+            .listStyle(.sidebar)
+            .scrollContentBackground(.hidden)
+            // The disk card sits below the list, not inside it, so it can never
+            // make the list wider than the column.
+            VolumeBox().padding(.horizontal, 16).padding(.vertical, 12)
         }
-        .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) { VolumeBox().padding(16) }
+        .background(Theme.sidebar.ignoresSafeArea())
+    }
+
+    /// Lines up with the row text, like the brand and disk card do.
+    private func header(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.textTertiary)
+            .padding(.leading, 10)
     }
 
     private func row(_ t: Tool, _ title: String, _ icon: String, _ meta: String) -> some View {
-        NavigationLink(value: t) {
-            HStack {
-                Label(title, systemImage: icon)
-                Spacer()
-                Text(meta).font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        SidebarRow(title: title, icon: icon, meta: meta, selected: model.tool == t) { model.tool = t }
+    }
+}
+
+/// Sidebar item with the theme's own highlight instead of the system-blue selection.
+struct SidebarRow: View {
+    let title: String
+    let icon: String
+    let meta: String
+    let selected: Bool
+    let action: () -> Void
+    @StateVar private var hovered = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(selected ? Theme.accentText : Theme.textSecondary)
+                .frame(width: 20)
+            Text(title)
+                .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            if !meta.isEmpty {
+                Text(meta)
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
             }
         }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.nav)
+                .fill(selected ? Theme.navActive : hovered ? Theme.navHover : .clear)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.nav))
+        .onTapGesture(perform: action)
+        .onHover { hovered = $0 }
+        .listRowInsets(EdgeInsets(top: 1, leading: 0, bottom: 1, trailing: 0))
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction(.default, action)
+    }
+}
+
+/// App logo and name at the top of the sidebar.
+struct SidebarBrand: View {
+    var body: some View {
+        HStack(spacing: 9) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 26, height: 26)
+            Text("CleanBro")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 21)
+        .padding(.top, 2).padding(.bottom, 10)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -155,28 +230,66 @@ struct VolumeBox: View {
     var body: some View {
         let used = max(0, model.volumeTotal - model.volumeFree)
         let frac = model.volumeTotal > 0 ? Double(used) / Double(model.volumeTotal) : 0
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(model.volumeName).fontWeight(.medium)
-                Spacer()
-                Text(L("\(Fmt.size(model.volumeFree)) free", "\(Fmt.size(model.volumeFree)) kosong")).foregroundStyle(.secondary)
-                AppearanceToggle()
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "internaldrive")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(model.volumeName)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 4)
+                    AppearanceToggle()
+                }
+                GeometryReader { g in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.track)
+                        Capsule().fill(frac > 0.9 ? Color.red : Theme.accentBar)
+                            .frame(width: max(4, g.size.width * frac))
+                    }
+                }
+                .frame(height: 5)
+                HStack {
+                    Text(L("\(Fmt.size(model.volumeFree)) free", "\(Fmt.size(model.volumeFree)) kosong"))
+                        .foregroundStyle(Theme.textPrimary)
+                        .layoutPriority(1)
+                    Spacer()
+                    Text(L("of \(Fmt.size(model.volumeTotal))", "dari \(Fmt.size(model.volumeTotal))"))
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .font(.system(size: 11))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .help(L("\(Fmt.size(used)) of \(Fmt.size(model.volumeTotal)) used", "\(Fmt.size(used)) dari \(Fmt.size(model.volumeTotal)) terpakai"))
             }
-            .font(.system(size: 12))
-            ProgressView(value: frac).tint(frac > 0.9 ? .red : .accentTeal)
-            Text(L("\(Fmt.size(used)) of \(Fmt.size(model.volumeTotal)) used", "\(Fmt.size(used)) dari \(Fmt.size(model.volumeTotal)) terpakai"))
-                .font(.system(size: 11)).foregroundStyle(.secondary)
-            Divider().padding(.vertical, 2)
-            HStack(spacing: 6) {
-                Label(L("Trash", "Sampah"), systemImage: (model.trashCount ?? 0) > 0 ? "trash.fill" : "trash")
-                Spacer()
-                Text(model.trashSize.map(Fmt.size) ?? "—").foregroundStyle(.secondary).monospacedDigit()
+            .padding(10)
+
+            Rectangle().fill(Theme.borderSubtle).frame(height: 1)
+
+            HStack(spacing: 8) {
+                Image(systemName: (model.trashCount ?? 0) > 0 ? "trash.fill" : "trash")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 16)
+                Text(L("Trash", "Sampah")).foregroundStyle(Theme.textPrimary)
+                Text(model.trashSize.map(Fmt.size) ?? "—")
+                    .foregroundStyle(Theme.textTertiary).monospacedDigit()
+                Spacer(minLength: 4)
                 Button(L("Empty", "Kosongkan")) { model.requestEmptyTrash() }
                     .controlSize(.small)
                     .disabled(model.trashCount == 0 || model.isDeleting)
             }
             .font(.system(size: 12))
+            .lineLimit(1)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(Theme.footer)
         }
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).strokeBorder(Theme.border))
         .onAppear { model.refreshVolume() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.refreshVolume()
@@ -195,7 +308,8 @@ struct ToastView: View {
                 .font(.callout)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 18).padding(.vertical, 10)
-                .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.toast, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).strokeBorder(Theme.borderSubtle))
                 .padding(.bottom, 70)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                 .animation(.easeOut, value: model.toast)

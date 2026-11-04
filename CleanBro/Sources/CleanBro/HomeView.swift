@@ -80,6 +80,8 @@ struct MapBlock: Identifiable {
     var light = false
     /// white overlay that tells nested blocks apart
     var shade: Double = 0
+    /// explanation shown in the tooltip (for blocks that aren't files)
+    var note: String?
     var children: [MapBlock] = []
 }
 
@@ -135,9 +137,16 @@ private struct MapBuilder {
         case .overview:
             return categories().map { cat, size, raw in
                 var b = MapBlock(id: "cat:" + cat.rawValue, name: cat.title, size: size,
-                                 target: cat == .other ? nil : .category(cat.rawValue),
+                                 target: raw.isEmpty ? nil : .category(cat.rawValue),
                                  color: cat.color, light: cat == .other)
-                if !raw.isEmpty {
+                if cat == .other {
+                    // its parts aren't files: shades of the category gray
+                    b.children = raw.enumerated().map { i, k in
+                        var k = k
+                        k.color = cat.color; k.light = true; k.shade = 0.1 + 0.08 * Double(i % 4)
+                        return k
+                    }
+                } else if !raw.isEmpty {
                     b.children = shadeChildren(group(raw, total: size, max: 10, minFrac: 0.03, id: b.id), of: b)
                 }
                 return b
@@ -145,7 +154,8 @@ private struct MapBuilder {
             .filter { $0.size > 0 }
             .sorted { $0.size > $1.size }
         case .category(let key):
-            guard let (_, size, raw) = categories().first(where: { $0.0.rawValue == key }) else { return [] }
+            guard let (cat, size, raw) = categories().first(where: { $0.0.rawValue == key }) else { return [] }
+            if cat == .other { return raw }
             return nest(group(raw, total: size, max: 24, minFrac: 0.004, id: key))
         case .node(let path):
             guard let n = model.node(at: path) else { return [] }
@@ -168,12 +178,78 @@ private struct MapBuilder {
         }
         let sysRaw = entries(root).filter { $0.path != users?.path && $0.path != apps?.path }
         let usersSize = users?.size ?? 0, appsSize = apps?.size ?? 0
+        let other = otherParts(unseen: max(0, model.volumeUsed - root.size))
         return [
             (.users, usersSize, userRaw),
             (.apps, appsSize, apps.map(entries) ?? []),
             (.system, max(0, root.size - usersSize - appsSize), sysRaw),
-            (.other, max(0, model.volumeUsed - root.size), []),
+            (.other, other.reduce(0) { $0 + $1.size }, other),
         ]
+    }
+
+    /// Splits the space the scan didn't see into what can be measured
+    /// (other APFS volumes, skipped folders) and what stays unknown.
+    private func otherParts(unseen: Int64) -> [MapBlock] {
+        guard let info = model.otherSpace else {
+            return unseen > 0 ? [unreadable(unseen, info: nil)] : []
+        }
+        var out: [MapBlock] = []
+        let slate = Color(red: 0.45, green: 0.50, blue: 0.58)
+        for v in info.volumes {
+            let (name, note): (String, String) = switch v.role {
+            case "Preboot":
+                (L("Boot files", "File boot"),
+                 L("Preboot volume: what macOS needs to start up, kept per installed macOS version.",
+                   "Volume Preboot: file yang dibutuhkan macOS untuk menyala, disimpan per versi macOS yang terpasang."))
+            case "Recovery":
+                (L("Recovery", "Pemulihan"),
+                 L("Recovery volume: macOS Recovery, used to reinstall or repair macOS.",
+                   "Volume Recovery: macOS Recovery untuk memasang ulang atau memperbaiki macOS."))
+            case "VM":
+                (L("Swap & sleep image", "Swap & hibernasi"),
+                 L("VM volume: memory swapped to disk (\(Fmt.size(info.swapUsed)) in use now) and the sleep image. macOS manages it; it shrinks after a restart.",
+                   "Volume VM: memori yang dipindah ke disk (\(Fmt.size(info.swapUsed)) terpakai sekarang) dan image hibernasi. Diatur macOS; mengecil setelah restart."))
+            case "Update":
+                (L("macOS updates", "Pembaruan macOS"),
+                 L("Update volume: downloaded or staged macOS updates.", "Volume Update: pembaruan macOS yang sudah diunduh atau disiapkan."))
+            default:
+                (v.name, L("Another APFS volume on this disk.", "Volume APFS lain di disk ini."))
+            }
+            out.append(MapBlock(id: "other:vol:" + v.name + v.role, name: name, size: v.size,
+                                color: slate, note: note + "\n" + L("Managed by macOS, not deleted from here.", "Diatur macOS, tidak dihapus dari sini.")))
+        }
+        let teal = Color(red: 0.13, green: 0.52, blue: 0.53)
+        for f in info.folders {
+            out.append(MapBlock(id: "other:dir:" + f.path, name: (f.path as NSString).lastPathComponent, size: f.size,
+                                color: teal,
+                                note: (f.path as NSString).abbreviatingWithTildeInPath + "\n" + f.reason.help
+                                    + "\n" + L("Scan this folder from Disk Usage to see what's inside.",
+                                                 "Pindai folder ini dari Penggunaan Disk untuk melihat isinya.")))
+        }
+        let known = out.reduce(0) { $0 + $1.size }
+        let rest = unseen - known
+        if rest > 0 { out.append(unreadable(rest, info: info)) }
+        return out.sorted { $0.size > $1.size }
+    }
+
+    private func unreadable(_ size: Int64, info: OtherSpaceInfo?) -> MapBlock {
+        var lines = [L("Space macOS counts as used that the scan couldn't read:",
+                       "Ruang yang dihitung terpakai oleh macOS tapi tidak terbaca saat pemindaian:")]
+        if model.progress.errors > 0 {
+            lines.append("• " + L("\(Fmt.count(model.progress.errors)) items without permission (grant Full Disk Access)",
+                                   "\(Fmt.count(model.progress.errors)) item tanpa izin (beri Full Disk Access)"))
+        }
+        if let info, info.snapshots > 0 {
+            lines.append("• " + L("\(info.snapshots) local APFS snapshots (Time Machine, macOS updates)",
+                                   "\(info.snapshots) snapshot APFS lokal (Time Machine, pembaruan macOS)"))
+        }
+        if let info, !info.cloudFolders.isEmpty {
+            lines.append("• " + L("Downloaded files in cloud folders: ", "File yang sudah diunduh di folder cloud: ")
+                         + info.cloudFolders.map { ($0 as NSString).abbreviatingWithTildeInPath }.joined(separator: ", "))
+        }
+        lines.append("• " + L("Protected app data, APFS metadata and caches", "Data aplikasi yang dilindungi, metadata APFS, dan cache"))
+        return MapBlock(id: "other:unread", name: info == nil ? L("Measuring…", "Mengukur…") : L("Unreadable", "Tidak terbaca"),
+                        size: size, color: Category.other.color, light: true, note: lines.joined(separator: "\n"))
     }
 
     /// Folders and (large) files directly inside `node`.
@@ -278,13 +354,14 @@ struct HomeView: View {
             // the home map is about the whole disk
             if model.tree == nil && model.scanState == .idle { model.scanRoot = URL(fileURLWithPath: "/") }
         }
-        .task(id: Key(focus: current, rev: model.revision, used: model.volumeUsed, ready: model.scanState == .done)) {
+        .task(id: Key(focus: current, rev: model.revision, used: model.volumeUsed, ready: model.scanState == .done,
+                      other: model.otherSpace != nil)) {
             rebuild()
         }
         .onChange(of: model.tree?.path) { focus = nil }
     }
 
-    private struct Key: Hashable { let focus: MapFocus; let rev: Int; let used: Int64; let ready: Bool }
+    private struct Key: Hashable { let focus: MapFocus; let rev: Int; let used: Int64; let ready: Bool; let other: Bool }
 
     private func rebuild() {
         guard let tree = model.tree, model.scanState == .done else { blocks = []; return }
@@ -497,6 +574,7 @@ struct HomeView: View {
     }
 
     private func tooltip(_ b: MapBlock) -> String {
+        if let n = b.note { return "\(b.name) · \(Fmt.size(b.size))\n\(n)" }
         if let p = b.path { return "\((p as NSString).abbreviatingWithTildeInPath)\n\(Fmt.size(b.size))" }
         if let c = Category.allCases.first(where: { "cat:" + $0.rawValue == b.id }) {
             return "\(c.title) · \(Fmt.size(b.size))\n\(c.help)"
@@ -530,8 +608,29 @@ struct HomeView: View {
                 }
                 .padding(.vertical, 8)
             }
+            if current == .category(Category.other.rawValue) { otherFooter }
         }
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+    }
+
+    /// How to shrink the unreadable part of Other Space.
+    private var otherFooter: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(model.progress.errors > 0
+                 ? L("\(Fmt.count(model.progress.errors)) items couldn't be read. With Full Disk Access, more of this space is shown as real folders.",
+                     "\(Fmt.count(model.progress.errors)) item tidak bisa dibaca. Dengan Full Disk Access, lebih banyak ruang ini tampil sebagai folder sungguhan.")
+                 : L("Hover a block to see what it holds. System volumes are managed by macOS.",
+                     "Arahkan kursor ke blok untuk melihat isinya. Volume sistem diatur oleh macOS."))
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if model.progress.errors > 0 {
+                Button(L("Grant Access…", "Beri Akses…")) { model.askFullDiskAccess = true }
+                    .controlSize(.small)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { Divider() }
     }
 
     private func sideRow(_ b: MapBlock, frac: Double) -> some View {
@@ -567,6 +666,7 @@ struct HomeView: View {
         }
         .font(.system(size: 13))
         .padding(.horizontal, 20).padding(.vertical, 7)
+        .help(b.note ?? "")
         .contextMenu {
             if let t = b.target { Button(L("Open", "Buka")) { focus = t } }
             if let p = b.path { Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal([p]) } }

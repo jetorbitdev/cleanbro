@@ -138,6 +138,8 @@ final class AppModel {
     var scanPartial = false
     /// folders left out of the last scan (cloud, network, or skipped by the user)
     var skippedFolders: [DirNode] = []
+    /// breakdown of space the scan of "/" couldn't see (nil while measuring or not a disk scan)
+    var otherSpace: OtherSpaceInfo?
     /// folders every analysis scan leaves out, kept across launches
     var alwaysSkip: [String] = UserDefaults.standard.stringArray(forKey: "alwaysSkip") ?? [] {
         didSet { UserDefaults.standard.set(alwaysSkip, forKey: "alwaysSkip") }
@@ -424,6 +426,7 @@ final class AppModel {
         let excluded = alwaysSkip
         scanState = .scanning
         scanJob = p
+        otherSpace = nil
         scanStopping = false
         ensurePolling()
         let start = Date()
@@ -444,12 +447,26 @@ final class AppModel {
                     self.scanState = .done
                     self.marks[.home] = []; self.marks[.usage] = []; self.marks[.large] = []; self.marks[.stale] = []
                     self.revision += 1
+                    if tree.path == "/" { self.measureOtherSpace() }
                 }
             }
         }
         thread.stackSize = 64 << 20
         thread.qualityOfService = .userInitiated
         thread.start()
+    }
+
+    /// Fills `otherSpace` for the current disk scan.
+    func measureOtherSpace() {
+        let skipped = skippedFolders.compactMap { n in n.skipped.map { (path: n.path, reason: $0) } }
+        let scanned = tree
+        Task.detached(priority: .utility) {
+            let info = OtherSpace.measure(skipped: skipped)
+            await MainActor.run {
+                guard let scanned, self.tree === scanned else { return }
+                self.otherSpace = info
+            }
+        }
     }
 
     func node(at path: String) -> DirNode? {
