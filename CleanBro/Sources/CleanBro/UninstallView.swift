@@ -26,7 +26,14 @@ struct AppsView: View {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
                                 .resizable().frame(width: 28, height: 28)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(app.name).lineLimit(1)
+                                HStack(spacing: 6) {
+                                    Text(app.name).lineLimit(1)
+                                    if let cask = model.brewCask(for: app.path) {
+                                        Tag(text: "Homebrew", color: .accentTeal)
+                                            .help(L("Installed with Homebrew (brew install --cask \(cask.name))",
+                                                    "Dipasang lewat Homebrew (brew install --cask \(cask.name))"))
+                                    }
+                                }
                                 Text(app.location).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                         }
@@ -75,7 +82,11 @@ struct AppsView: View {
                     .disabled(model.appsLoading)
             }
         }
-        .task { if model.apps.isEmpty { model.loadApps() } }
+        .task {
+            if model.apps.isEmpty { model.loadApps() }
+            // to mark apps that came from a Homebrew cask
+            if !model.brewLoaded { model.loadBrew() }
+        }
     }
 }
 
@@ -137,6 +148,17 @@ struct UninstallSheet: View {
         let runningNames = running.compactMap(\.localizedName).joined(separator: ", ")
         return VStack(spacing: 0) {
             VStack(spacing: 8) {
+                if let cask {
+                    Notice(icon: "mug", tint: .accentTeal,
+                           text: L("\(app.name) was installed with Homebrew (cask \(cask.name)). Uninstall it with Homebrew so brew stops tracking it; removing it here leaves brew thinking it's still installed.",
+                                   "\(app.name) dipasang lewat Homebrew (cask \(cask.name)). Uninstall lewat Homebrew agar brew berhenti mencatatnya; kalau dihapus di sini, brew masih menganggapnya terpasang.")) {
+                        Menu(L("Use Homebrew", "Pakai Homebrew")) {
+                            Button(L("Uninstall", "Uninstall")) { brewUninstall(zap: false) }
+                            Button(L("Uninstall and Remove App Data (Zap)", "Uninstall dan Hapus Data Aplikasi (Zap)")) { brewUninstall(zap: true) }
+                        }
+                        .fixedSize()
+                    }
+                }
                 if let official {
                     Notice(icon: "wrench.and.screwdriver", tint: .accentTeal,
                            text: L("\(app.name) has an official uninstaller. Run it first so its background services are shut down properly, then clean up whatever is left here.",
@@ -152,7 +174,7 @@ struct UninstallSheet: View {
                                 "\(runningNames) sedang berjalan dan akan diminta keluar. Jika masih terbuka (misalnya menunggu Anda menyimpan pekerjaan), uninstall dibatalkan."))
                 }
             }
-            .padding(.horizontal, 20).padding(.top, official != nil || !running.isEmpty ? 12 : 0)
+            .padding(.horizontal, 20).padding(.top, official != nil || cask != nil || !running.isEmpty ? 12 : 0)
 
             List {
                 section(L("App", "Aplikasi"), items.filter { $0.match == .app })
@@ -264,6 +286,14 @@ struct UninstallSheet: View {
     }
 
     // MARK: actions
+
+    private var cask: BrewPackage? { model.brewCask(for: app.path) }
+
+    private func brewUninstall(zap: Bool) {
+        guard let cask else { return }
+        dismiss()
+        model.brewUninstall([cask], zap: zap)
+    }
 
     private func load() async {
         let app = app

@@ -80,6 +80,7 @@ struct ContentView: View {
                 case .home: HomeView()
                 case .clean: CleanView()
                 case .apps: AppsView()
+                case .brew: HomebrewView()
                 case .usage: AnalysisGate { DiskUsageView() }
                 case .large: AnalysisGate { LargeFilesView() }
                 case .stale: AnalysisGate { StaleView() }
@@ -91,6 +92,13 @@ struct ContentView: View {
         }
         .overlay(alignment: .bottom) { ToastView() }
         .overlay { if model.isDeleting { DeletingOverlay() } }
+        .overlay { if let busy = model.brewBusy { BrewBusyOverlay(text: busy) } }
+        .alert(L("Homebrew Reported an Error", "Homebrew melaporkan error"),
+               isPresented: Binding(get: { model.brewError != nil }, set: { if !$0 { model.brewError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.brewError ?? "")
+        }
         .modifier(DeleteConfirmation())
         .modifier(FullDiskAccessPrompt())
         .sheet(item: Binding(get: { model.uninstallTarget }, set: { model.uninstallTarget = $0 })) { app in
@@ -113,6 +121,8 @@ struct Sidebar: View {
                     model.cleanPhase == .done ? Fmt.size(model.junkSelectedSize) : "")
                 row(.apps, L("Uninstall Apps", "Uninstall Aplikasi"), "trash.square",
                     model.apps.isEmpty ? "" : String(model.apps.count))
+                row(.brew, "Homebrew", "mug",
+                    model.brewPackages.isEmpty ? "" : String(model.brewPackages.count))
             }
             Section(L("Analysis", "Analisis")) {
                 row(.usage, L("Disk Usage", "Penggunaan Disk"), "chart.bar.doc.horizontal",
@@ -152,10 +162,10 @@ struct VolumeBox: View {
                 Text(L("\(Fmt.size(model.volumeFree)) free", "\(Fmt.size(model.volumeFree)) kosong")).foregroundStyle(.secondary)
                 AppearanceToggle()
             }
-            .font(.caption)
+            .font(.system(size: 12))
             ProgressView(value: frac).tint(frac > 0.9 ? .red : .accentTeal)
             Text(L("\(Fmt.size(used)) of \(Fmt.size(model.volumeTotal)) used", "\(Fmt.size(used)) dari \(Fmt.size(model.volumeTotal)) terpakai"))
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(.system(size: 11)).foregroundStyle(.secondary)
             Divider().padding(.vertical, 2)
             HStack(spacing: 6) {
                 Label(L("Trash", "Sampah"), systemImage: (model.trashCount ?? 0) > 0 ? "trash.fill" : "trash")
@@ -165,7 +175,7 @@ struct VolumeBox: View {
                     .controlSize(.small)
                     .disabled(model.trashCount == 0 || model.isDeleting)
             }
-            .font(.caption)
+            .font(.system(size: 12))
         }
         .onAppear { model.refreshVolume() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

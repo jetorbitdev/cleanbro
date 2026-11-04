@@ -90,7 +90,7 @@ struct Item: Identifiable, Hashable {
 // MARK: - App state
 
 enum Tool: String, Hashable, CaseIterable {
-    case home, clean, apps, usage, large, stale, dupes
+    case home, clean, apps, brew, usage, large, stale, dupes
 }
 
 struct PendingDelete: Identifiable {
@@ -166,6 +166,15 @@ final class AppModel {
     var appsLoading = false
     /// app whose uninstall sheet is open
     var uninstallTarget: InstalledApp?
+
+    // homebrew
+    var brewPackages: [BrewPackage] = []
+    var brewLoading = false
+    var brewLoaded = false
+    /// brew uninstall / cleanup in progress, with what to show meanwhile
+    var brewBusy: String?
+    /// last brew failure, shown in an alert
+    var brewError: String?
 
     // selection per tool
     var marks: [Tool: Set<String>] = [:]
@@ -619,6 +628,71 @@ final class AppModel {
             await MainActor.run {
                 self.apps = list
                 self.appsLoading = false
+            }
+        }
+    }
+
+    // MARK: homebrew
+
+    func loadBrew() {
+        guard !brewLoading, Homebrew.executable != nil else { return }
+        brewLoading = true
+        Task.detached(priority: .userInitiated) {
+            let result = Result { try Homebrew.installed() }
+            await MainActor.run {
+                switch result {
+                case .success(let list): self.brewPackages = list
+                case .failure(let e): self.brewError = (e as? BrewError)?.message ?? e.localizedDescription
+                }
+                self.brewLoading = false
+                self.brewLoaded = true
+            }
+        }
+    }
+
+    /// Homebrew cask that installed the app (or the vendor folder) at `path`.
+    func brewCask(for path: String) -> BrewPackage? {
+        brewPackages.first { p in
+            p.kind == .cask && p.paths.contains { $0 == path || $0.hasPrefix(path + "/") }
+        }
+    }
+
+    func brewUninstall(_ pkgs: [BrewPackage], zap: Bool) {
+        guard brewBusy == nil, !pkgs.isEmpty else { return }
+        let names = pkgs.map(\.name).joined(separator: ", ")
+        brewBusy = L("Uninstalling \(names)…", "Meng-uninstall \(names)…")
+        let size = pkgs.reduce(0) { $0 + $1.size }
+        Task.detached(priority: .userInitiated) {
+            let r = Homebrew.uninstall(pkgs, zap: zap)
+            await MainActor.run {
+                self.brewBusy = nil
+                if r.ok {
+                    self.flash(L("\(names) uninstalled · \(Fmt.size(size)) freed", "\(names) sudah di-uninstall · \(Fmt.size(size)) dibebaskan"))
+                } else {
+                    self.brewError = r.message
+                }
+                self.refreshVolume()
+                self.loadBrew()
+                if !self.apps.isEmpty { self.loadApps() }
+            }
+        }
+    }
+
+    func brewCleanup() {
+        guard brewBusy == nil else { return }
+        brewBusy = L("Removing old versions and cache…", "Menghapus versi lama dan cache…")
+        Task.detached(priority: .userInitiated) {
+            let (r, freed) = Homebrew.cleanup()
+            await MainActor.run {
+                self.brewBusy = nil
+                if r.ok {
+                    self.flash(freed.map { L("Homebrew cleanup freed \($0)", "Cleanup Homebrew membebaskan \($0)") }
+                               ?? L("Homebrew is already clean", "Homebrew sudah bersih"))
+                } else {
+                    self.brewError = r.message
+                }
+                self.refreshVolume()
+                self.loadBrew()
             }
         }
     }
