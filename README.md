@@ -21,6 +21,7 @@ Two tools for inspecting and tidying up disk usage on macOS:
   - [Build](#build-1)
   - [Permissions](#permissions)
 - [CI/CD](#cicd)
+- [Changelog](#changelog)
 - [Project structure](#project-structure)
 - [License](#license)
 
@@ -122,8 +123,10 @@ Requires macOS 14 (Sonoma) or later and the Swift 6 toolchain (Xcode 16+).
 ### Features
 
 **Tools**
+- **Home**: start screen with a disk-usage map (including a breakdown of *Other* space), stat cards, and a collect-and-trash bar.
 - **Cleanup**: scans and removes app caches, logs and crash reports, developer data (Xcode DerivedData, DeviceSupport, simulator caches, npm, Gradle, `~/.cache`), incomplete downloads, and the Trash.
-- **Uninstall Apps**: removes an app together with its support files.
+- **Uninstall Apps**: removes an app together with its support files. Apps installed from a Homebrew cask can be removed through Homebrew.
+- **Homebrew**: lists installed formulae and casks with their sizes, uninstalls them (optionally with zap), and runs `brew cleanup`.
 
 **Analysis**
 - **Disk Usage**: folder size tree.
@@ -132,6 +135,8 @@ Requires macOS 14 (Sonoma) or later and the Swift 6 toolchain (Xcode 16+).
 - **Duplicate Files**: finds duplicates by size, then by SHA-256 hash.
 
 Files can be moved to the Trash or deleted permanently. Folders you don't want scanned can be excluded in Settings (⌘,).
+
+**Appearance and language**: System, Light or Dark mode (sidebar button, View menu, or Settings › General), and an English or Bahasa Indonesia interface (Settings › General).
 
 ### Build
 
@@ -182,6 +187,32 @@ To release, push a version tag. The workflow creates a GitHub Release containing
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+## Changelog
+
+### v1.1.0 (2026-11-04)
+
+- **Home dashboard**: new default start screen with a disk-usage map, stat cards, and a collect-and-trash bar.
+- **Other space breakdown**: the *Other* block on the map can be opened to show other APFS volumes in the startup container (Preboot, Recovery, VM/swap, Update), skipped folders with their measured size, and what couldn't be read, with the reason (permission errors, local snapshots, cloud folders). A Full Disk Access button appears when items couldn't be read.
+- **Homebrew tool**: list installed formulae and casks with sizes, uninstall (optionally zap), and run `brew cleanup`. Uninstall Apps tags cask-installed apps and offers to remove them through Homebrew so brew's records stay in sync.
+- **Light/dark mode**: System, Light or Dark, from the sidebar, the View menu, or Settings › General.
+- **Language**: English (default) or Bahasa Indonesia; dates and numbers follow the choice.
+- New theme, refreshed sidebar, and a matching split divider.
+- Build: the development region is now `en`, so AppKit's own menus no longer default to Indonesian.
+
+### v1.0.2 (2026-11-03)
+
+- New broom app icon.
+- One-line installer (`install.sh`) and an easiest-first install guide.
+- The app asks for Full Disk Access on first launch.
+
+### v1.0.1 (2026-11-03)
+
+- The CLI was renamed from `cekdisk` to `cleanbro`.
+
+### v1.0.0 (2026-11-03)
+
+- First release: the `cleanbro` CLI and the CleanBro app (Cleanup, Uninstall Apps, Disk Usage, Large Files, Stale Files, Duplicate Files), universal builds, and GitHub Releases from version tags.
 
 ## Project structure
 
