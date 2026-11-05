@@ -149,11 +149,7 @@ private struct DupeRow: View {
                 set: { on in if on { marked.insert(item.id) } else { marked.remove(item.id) } }
             ))
             .toggleStyle(.checkbox).labelsHidden()
-            Text(item.badge)
-                .font(.system(size: 9, weight: .bold)).tracking(0.4)
-                .foregroundStyle(item.kind.tint)
-                .frame(width: 38, height: 24)
-                .background(item.kind.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 4))
+            KindBadge(item: item)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).lineLimit(1).truncationMode(.middle)
                 Text(item.location).font(.caption).foregroundStyle(.secondary)

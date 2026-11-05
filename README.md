@@ -190,6 +190,10 @@ git push origin v1.0.0
 
 ## Changelog
 
+### v1.1.1 (2026-11-05)
+
+- Fix: the DIR / file-type badge is now readable on selected rows in both light and dark themes.
+
 ### v1.1.0 (2026-11-04)
 
 - **Home dashboard**: new default start screen with a disk-usage map, stat cards, and a collect-and-trash bar.

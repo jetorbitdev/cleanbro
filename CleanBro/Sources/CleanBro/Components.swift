@@ -109,6 +109,26 @@ struct AnalysisGate<Content: View>: View {
     }
 }
 
+// MARK: - Kind badge (DIR / ext) that stays legible on selected rows
+
+struct KindBadge: View {
+    let item: Item
+    /// `.increased` when the row sits on the accent-coloured selection background.
+    @Environment(\.backgroundProminence) private var prominence
+
+    var body: some View {
+        let selected = prominence == .increased
+        Text(item.badge)
+            .font(.system(size: 9, weight: .bold)).tracking(0.4)
+            .foregroundStyle(selected ? Color.white : item.kind.tint)
+            .frame(width: 38, height: 24)
+            .background(selected ? Color.white.opacity(0.22) : item.kind.tint.opacity(0.13),
+                        in: RoundedRectangle(cornerRadius: 4))
+            .overlay(RoundedRectangle(cornerRadius: 4)
+                .strokeBorder(selected ? Color.white.opacity(0.55) : .clear, lineWidth: 0.5))
+    }
+}
+
 // MARK: - Table of files/folders with checkboxes and sortable columns
 
 struct ItemTable: View {
@@ -135,11 +155,7 @@ struct ItemTable: View {
 
             TableColumn(L("Name", "Nama"), value: \.name) { item in
                 HStack(spacing: 10) {
-                    Text(item.badge)
-                        .font(.system(size: 9, weight: .bold)).tracking(0.4)
-                        .foregroundStyle(item.kind.tint)
-                        .frame(width: 38, height: 24)
-                        .background(item.kind.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: 4))
+                    KindBadge(item: item)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(item.name).lineLimit(1).truncationMode(.middle)
                         Text(item.location).font(.caption).foregroundStyle(.secondary)
