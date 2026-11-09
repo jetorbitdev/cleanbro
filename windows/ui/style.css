@@ -13,3 +13,20 @@ li.dir { cursor:pointer; }
 li .bar { position:absolute; inset:0 auto 0 0; background:var(--bar); z-index:0; }
 li span { position:relative; z-index:1; }
 li .size { color:var(--mute); font-variant-numeric:tabular-nums; }
+
+header { gap:16px; }
+nav { display:flex; gap:4px; }
+nav button { border:0; color:var(--mute); }
+nav button.on { background:var(--bar); color:var(--fg); }
+#bar { display:flex; gap:8px; align-items:center; padding:8px 16px; border-bottom:1px solid var(--line); }
+#opts { display:flex; gap:8px; align-items:center; color:var(--mute); }
+#opts select, #opts input { background:transparent; color:inherit; border:1px solid var(--line); border-radius:6px; padding:5px 6px; }
+li.file { cursor:pointer; gap:12px; }
+li.file .name { flex:1; min-width:0; }
+li.file .name small { display:block; color:var(--mute); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+li.file .date { color:var(--mute); }
+li.head { background:var(--line); font-weight:600; cursor:default; }
+li.sel { background:var(--bar); }
+footer { position:fixed; inset:auto 0 0 0; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:var(--bg); border-top:1px solid var(--line); }
+footer[hidden] { display:none; }
+main { padding-bottom:56px; }

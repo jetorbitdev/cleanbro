@@ -1,8 +1,15 @@
+mod files;
 mod scan;
 
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![scan::scan_dir, scan::home_dir])
+        .invoke_handler(tauri::generate_handler![
+            scan::scan_dir,
+            scan::home_dir,
+            files::scan_files,
+            files::find_dupes,
+            files::trash_paths,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running CleanBro");
 }

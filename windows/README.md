@@ -5,7 +5,7 @@ Tauri v2 app: Rust backend (`src-tauri/`), plain HTML/JS UI (`ui/`). Separate fr
 ## Status
 
 - [x] Disk Usage (folder size tree)
-- [ ] Large Files / Stale Files / Duplicates
+- [x] Large Files, Stale Files, Duplicates (SHA-256, three-pass) with Recycle Bin removal
 - [ ] Cleanup (`%TEMP%`, `%LOCALAPPDATA%` caches, crash dumps, Recycle Bin)
 - [ ] Uninstall Apps (registry `Uninstall` keys)
 - [ ] winget / Scoop tool (replaces Homebrew)

@@ -9,14 +9,27 @@
 <body>
 <header>
   <h1>CleanBro</h1>
+  <nav id="tabs">
+    <button data-tab="usage" class="on">Disk Usage</button>
+    <button data-tab="large">Large Files</button>
+    <button data-tab="stale">Stale Files</button>
+    <button data-tab="dupes">Duplicates</button>
+  </nav>
+</header>
+<div id="bar">
   <button id="up" title="Parent folder">↑</button>
   <input id="path" spellcheck="false">
   <button id="go">Scan</button>
-</header>
+  <span id="opts"></span>
+</div>
 <main>
   <div id="status"></div>
   <ul id="list"></ul>
 </main>
+<footer id="foot" hidden>
+  <span id="sel"></span>
+  <button id="trash">Move to Recycle Bin</button>
+</footer>
 <script src="app.js"></script>
 </body>
 </html>
