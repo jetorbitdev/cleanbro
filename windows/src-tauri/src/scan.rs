@@ -61,3 +61,33 @@ pub async fn scan_dir(path: String) -> Result<Vec<Entry>, String> {
     .await
     .map_err(|e| e.to_string())?
 }
+
+#[derive(Serialize)]
+pub struct DiskInfo {
+    name: String,
+    total: u64,
+    free: u64,
+}
+
+/// The volume that holds `path` (longest matching mount point).
+#[tauri::command]
+pub fn disk_info(path: String) -> Option<DiskInfo> {
+    let disks = sysinfo::Disks::new_with_refreshed_list().ok()?;
+    let p = Path::new(&path);
+    (&disks)
+        .into_iter()
+        .filter(|d| p.starts_with(d.mount_point()))
+        .max_by_key(|d| d.mount_point().as_os_str().len())
+        .map(|d| {
+            let mp = d.mount_point().to_string_lossy().into_owned();
+            let label = d.name().to_string_lossy().into_owned();
+            DiskInfo {
+                name: if cfg!(windows) {
+                    let drive = mp.trim_end_matches('\\');
+                    if label.is_empty() { format!("Local Disk ({drive})") } else { format!("{label} ({drive})") }
+                } else if label.is_empty() { mp } else { label },
+                total: d.total_space(),
+                free: d.available_space(),
+            }
+        })
+}

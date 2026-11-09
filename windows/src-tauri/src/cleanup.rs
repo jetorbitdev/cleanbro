@@ -2,7 +2,6 @@
 //! one item. The frontend only sends back paths; `clean_junk` re-derives the
 //! allowed roots and refuses anything that is not a direct child of one.
 
-use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
 
@@ -171,8 +170,10 @@ pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
                     }
                 }
             }
+            // sequential on purpose: dir_size walks with jwalk, which runs on the
+            // global rayon pool and deadlocks when called from inside a rayon job
             let mut items: Vec<JunkItem> = cands
-                .into_par_iter()
+                .into_iter()
                 .map(|(p, name)| {
                     let size = match std::fs::symlink_metadata(&p) {
                         Ok(m) if m.is_dir() => crate::scan::dir_size(&p),

@@ -7,30 +7,34 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1>CleanBro</h1>
-  <nav id="tabs">
-    <button data-tab="cleanup" class="on">Cleanup</button>
-    <button data-tab="usage">Disk Usage</button>
-    <button data-tab="large">Large Files</button>
-    <button data-tab="stale">Stale Files</button>
-    <button data-tab="dupes">Duplicates</button>
-  </nav>
-</header>
-<div id="bar">
-  <button id="up" title="Parent folder">↑</button>
-  <input id="path" spellcheck="false">
-  <button id="go">Scan</button>
-  <span id="opts"></span>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">CleanBro</div>
+    <div class="section" data-l="tools"></div>
+    <button class="nav" data-tab="cleanup"><i data-icon="sparkles"></i><span data-l="cleanup"></span><em id="badge"></em></button>
+    <div class="section" data-l="analysis"></div>
+    <button class="nav" data-tab="usage"><i data-icon="chart"></i><span data-l="usage"></span></button>
+    <button class="nav" data-tab="large"><i data-icon="file"></i><span data-l="large"></span></button>
+    <button class="nav" data-tab="stale"><i data-icon="clock"></i><span data-l="stale"></span></button>
+    <button class="nav" data-tab="dupes"><i data-icon="copy"></i><span data-l="dupes"></span></button>
+    <div class="spacer"></div>
+    <div class="disk" id="disk" hidden>
+      <div class="disk-row"><b id="disk-name"></b><span id="disk-free"></span></div>
+      <div class="track"><div id="disk-bar"></div></div>
+      <div class="disk-used" id="disk-used"></div>
+    </div>
+  </aside>
+
+  <section class="main">
+    <div class="titlebar" id="title"></div>
+    <div class="hero" id="hero"></div>
+    <div class="content" id="content"></div>
+    <footer class="footer">
+      <div id="foot-left"></div>
+      <div id="foot-right"></div>
+    </footer>
+  </section>
 </div>
-<main>
-  <div id="status"></div>
-  <ul id="list"></ul>
-</main>
-<footer id="foot" hidden>
-  <span id="sel"></span>
-  <button id="trash">Move to Recycle Bin</button>
-</footer>
 <script src="app.js"></script>
 </body>
 </html>

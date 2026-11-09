@@ -7,6 +7,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan::scan_dir,
             scan::home_dir,
+            scan::disk_info,
             cleanup::scan_junk,
             cleanup::clean_junk,
             files::scan_files,
