@@ -1,33 +1,47 @@
-# Installs the latest CleanBro for Windows from GitHub Releases.
+# Installs the latest CleanBro from GitHub Releases on Windows.
 #   irm https://raw.githubusercontent.com/jetorbitdev/cleanbro/main/install.ps1 | iex
-# Files downloaded with Invoke-WebRequest don't carry the "Mark of the Web",
-# so SmartScreen does not prompt. The installer runs per-user (no admin needed).
+#
+# Runs the NSIS setup silently. It installs for the current user, so no administrator
+# prompt. The download is checked against the SHA-256 digest GitHub records for the asset.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $repo = 'jetorbitdev/cleanbro'
-$base = "https://github.com/$repo/releases/latest/download"
-$name = 'CleanBro-windows-setup.exe'
-$tmp  = Join-Path ([IO.Path]::GetTempPath()) ("cleanbro-" + [guid]::NewGuid())
-New-Item -ItemType Directory -Path $tmp | Out-Null
+
+if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -and $env:PROCESSOR_ARCHITEW6432 -ne 'AMD64') {
+    # ARM64 Windows runs x64 apps under emulation, so only 32-bit Windows is turned away.
+    if ($env:PROCESSOR_ARCHITECTURE -ne 'ARM64') { throw 'CleanBro needs 64-bit Windows.' }
+}
 
 try {
-    Write-Host 'Downloading CleanBro...'
-    $exe = Join-Path $tmp $name
-    Invoke-WebRequest -Uri "$base/$name" -OutFile $exe
-    $sumFile = Join-Path $tmp "$name.sha256"
-    Invoke-WebRequest -Uri "$base/$name.sha256" -OutFile $sumFile
+    $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" `
+        -Headers @{ Accept = 'application/vnd.github+json' }
+} catch {
+    throw "Couldn't reach GitHub, or CleanBro has no published release yet."
+}
 
-    Write-Host 'Verifying checksum...'
-    $expected = ((Get-Content $sumFile -Raw).Trim() -split '\s+')[0].ToLower()
-    $actual = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
-    if ($expected -ne $actual) { throw 'Checksum mismatch, aborting.' }
+$asset = $release.assets | Where-Object { $_.name -like '*setup.exe' } | Select-Object -First 1
+if (-not $asset) { throw "The latest release ($($release.tag_name)) has no Windows setup file." }
 
+$file = Join-Path ([IO.Path]::GetTempPath()) $asset.name
+Write-Host "Downloading $($asset.name)..."
+Invoke-WebRequest $asset.browser_download_url -OutFile $file -UseBasicParsing
+
+try {
+    if ($asset.digest -like 'sha256:*') {
+        Write-Host 'Verifying checksum...'
+        $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+        if ($actual -ne $asset.digest.Substring(7)) { throw "Checksum mismatch for $($asset.name), aborting." }
+    } else {
+        Write-Warning "GitHub has no checksum for $($asset.name), skipping verification."
+    }
+
+    Get-Process CleanBro -ErrorAction SilentlyContinue | Stop-Process -Force
     Write-Host 'Installing...'
-    Start-Process -FilePath $exe -ArgumentList '/S' -Wait
-    Write-Host 'CleanBro installed. Find it in the Start menu.'
+    $proc = Start-Process $file -ArgumentList '/S' -Wait -PassThru
+    if ($proc.ExitCode -ne 0) { throw "The installer exited with code $($proc.ExitCode)." }
+} finally {
+    Remove-Item $file -Force -ErrorAction SilentlyContinue
 }
-finally {
-    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-}
+
+Write-Host "Installed CleanBro $($release.tag_name). Open it from the Start menu."

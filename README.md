@@ -61,7 +61,7 @@ Requires Windows 10 or later (64-bit). Paste this into PowerShell:
 irm https://raw.githubusercontent.com/jetorbitdev/cleanbro/main/install.ps1 | iex
 ```
 
-It downloads the latest release, verifies its checksum, and installs CleanBro for the current user (no admin rights needed). Or download `CleanBro-windows-setup.exe` from the [latest release](https://github.com/jetorbitdev/cleanbro/releases/latest); the installer isn't code-signed yet, so SmartScreen may warn: click **More info → Run anyway**.
+It downloads the latest release, verifies it against the SHA-256 digest GitHub records, and installs CleanBro for the current user (no admin rights needed). Or download `CleanBro-windows-setup.exe` from the [latest release](https://github.com/jetorbitdev/cleanbro/releases/latest); the installer isn't code-signed yet, so SmartScreen may warn: click **More info → Run anyway**.
 
 ## cleanbro (CLI)
 
