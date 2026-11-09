@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const DAY = 86400;
 const MB = 1 << 20;
 
-const state = { tab: "usage", files: null, filesRoot: "", sel: new Set(), dupes: [] };
+const state = { tab: "cleanup", files: null, filesRoot: "", sel: new Set(), dupes: [] };
 
 function fmt(n) {
   const u = ["B", "KB", "MB", "GB", "TB"];
@@ -45,6 +45,44 @@ function fileRow(f, extra) {
   if (extra) li.append(extra);
   li.onclick = () => toggle(f.path, li);
   return li;
+}
+
+// ---------- Cleanup ----------
+const CAT = {
+  temp: "Temporary files",
+  cache: "App & browser caches",
+  logs: "Crash dumps & error reports",
+  dev: "Developer caches",
+  dl: "Incomplete downloads",
+  recycle: "Recycle Bin",
+};
+
+async function cleanupTab() {
+  $("status").textContent = "Scanning…";
+  let cats;
+  try { cats = await invoke("scan_junk"); }
+  catch (err) { $("status").textContent = String(err); return; }
+  const total = cats.reduce((s, c) => s + c.items.reduce((t, i) => t + i.size, 0), 0);
+  $("status").textContent = total ? `${fmt(total)} can be cleaned` : "Already clean";
+  const rows = [];
+  for (const c of cats) {
+    const sum = c.items.reduce((s, i) => s + i.size, 0);
+    const head = el("li", "head");
+    head.append(el("span", "", CAT[c.id] || c.id),
+      el("span", "size", c.needs_access ? "Needs admin rights" : c.items.length ? fmt(sum) : "Already clean"));
+    const lis = c.items.map((i) => fileRow({ name: i.name, path: i.path, size: i.size, modified: 0 }));
+    head.style.cursor = c.items.length ? "pointer" : "default";
+    head.onclick = () => {
+      const all = c.items.every((i) => state.sel.has(i.path));
+      c.items.forEach((i, k) => {
+        all ? state.sel.delete(i.path) : state.sel.add(i.path);
+        lis[k].classList.toggle("sel", !all);
+      });
+      updateFoot(() => [...state.sel].reduce((s, p) => s + (sizeLookup.get(p) || 0), 0));
+    };
+    rows.push(head, ...lis);
+  }
+  $("list").replaceChildren(...rows);
 }
 
 // ---------- Disk Usage ----------
@@ -156,6 +194,9 @@ async function show(tab) {
   $("list").replaceChildren();
   state.sel.clear();
   updateFoot(() => 0);
+  $("bar").hidden = tab === "cleanup";
+  $("trash").textContent = tab === "cleanup" ? "Delete permanently" : "Move to Recycle Bin";
+  if (tab === "cleanup") return cleanupTab();
   if (tab === "usage") return usage($("path").value);
   if (tab === "large") return largeTab();
   if (tab === "stale") return staleTab();
@@ -169,6 +210,13 @@ $("up").onclick = () => { $("path").value = parent($("path").value); $("go").cli
 
 $("trash").onclick = async () => {
   const paths = [...state.sel];
+  if (state.tab === "cleanup") {
+    if (!paths.length || !confirm(`Permanently delete ${paths.length} item(s)? This cannot be undone.`)) return;
+    const r = await invoke("clean_junk", { paths });
+    await show("cleanup");
+    $("status").textContent = `Freed ${fmt(r.freed)}` + (r.failed.length ? ` · ${r.failed.length} in use or protected, skipped` : "");
+    return;
+  }
   if (!paths.length || !confirm(`Move ${paths.length} file(s) to the Recycle Bin?`)) return;
   const failed = await invoke("trash_paths", { paths });
   state.files = state.files?.filter((f) => !paths.includes(f.path) || failed.includes(f.path)) ?? null;
@@ -177,4 +225,4 @@ $("trash").onclick = async () => {
   if (failed.length) $("status").textContent += ` · ${failed.length} could not be moved`;
 };
 
-invoke("home_dir").then((h) => { $("path").value = h; usage(h); });
+invoke("home_dir").then((h) => { $("path").value = h; show("cleanup"); });

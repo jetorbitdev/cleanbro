@@ -30,3 +30,4 @@ li.sel { background:var(--bar); }
 footer { position:fixed; inset:auto 0 0 0; display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:var(--bg); border-top:1px solid var(--line); }
 footer[hidden] { display:none; }
 main { padding-bottom:56px; }
+#bar[hidden]{display:none}

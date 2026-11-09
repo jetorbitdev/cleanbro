@@ -53,7 +53,7 @@ On first launch, CleanBro asks for **Full Disk Access**. Click **Buka Pengaturan
 
 ## CleanBro for Windows
 
-> Early preview: Disk Usage, Large Files, Stale Files and Duplicates work so far. See [windows/README.md](windows/README.md) for progress.
+> Early preview: Cleanup, Disk Usage, Large Files, Stale Files and Duplicates work so far. See [windows/README.md](windows/README.md) for progress.
 
 Requires Windows 10 or later (64-bit). Paste this into PowerShell:
 

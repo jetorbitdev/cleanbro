@@ -19,7 +19,7 @@ pub fn home_dir() -> String {
         .unwrap_or_default()
 }
 
-fn dir_size(p: &Path) -> u64 {
+pub(crate) fn dir_size(p: &Path) -> u64 {
     WalkDir::new(p)
         .skip_hidden(false)
         .follow_links(false)
