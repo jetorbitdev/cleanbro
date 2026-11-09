@@ -1,6 +1,9 @@
 mod cleanup;
 mod files;
+#[cfg(windows)]
+mod registry;
 mod scan;
+mod uninstall;
 
 pub fn run() {
     tauri::Builder::default()
@@ -10,6 +13,10 @@ pub fn run() {
             scan::disk_info,
             cleanup::scan_junk,
             cleanup::clean_junk,
+            uninstall::list_apps,
+            uninstall::app_leftovers,
+            uninstall::run_uninstall,
+            uninstall::delete_leftovers,
             files::scan_files,
             files::find_dupes,
             files::trash_paths,

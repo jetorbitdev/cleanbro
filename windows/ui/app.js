@@ -8,6 +8,7 @@ const T = {
   tools: L("Tools", "Alat"),
   analysis: L("Analysis", "Analisis"),
   cleanup: L("Cleanup", "Pembersihan"),
+  uninstall: L("Uninstall Apps", "Uninstall Aplikasi"),
   usage: L("Disk Usage", "Penggunaan Disk"),
   large: L("Large Files", "File Besar"),
   stale: L("Stale Files", "Lama Tak Diubah"),
@@ -35,6 +36,7 @@ const ICONS = {
   hammer: '<path d="M15 12l-8.5 8.5a2.1 2.1 0 0 1-3-3L12 9"/><path d="M17.6 15L22 10.6l-6.6-6.6L11 8.4"/>',
   download: '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><path d="M12 8v8M8.5 12.5L12 16l3.5-3.5"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  apps: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
   chev: '<path d="M9 6l6 6-6 6"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
 };
@@ -86,6 +88,9 @@ const state = {
   sel: new Set(),
   sizes: new Map(),
   note: "",
+  apps: null,
+  app: null, // the app being uninstalled: { info, phase, leftovers, sel }
+  appQuery: "",
 };
 
 function setFooter(left, right) {
@@ -210,6 +215,150 @@ async function runClean() {
     (r.failed.length ? L(` · ${r.failed.length} in use, skipped`, ` · ${r.failed.length} sedang dipakai, dilewati`) : "");
   refreshDisk();
   await cleanup(true);
+}
+
+// ---------- Uninstall Apps ----------
+async function uninstall() {
+  if (state.app) return uninstallDetail();
+  const g = state.gen;
+  if (!state.apps) {
+    $("content").innerHTML = loading(L("Reading installed apps…", "Membaca aplikasi terpasang…"));
+    const apps = await invoke("list_apps").catch(() => []);
+    if (g !== state.gen) return;
+    state.apps = apps;
+  }
+  const q = h(`<input class="field" spellcheck="false" placeholder="${L("Search apps", "Cari aplikasi")}">`);
+  q.value = state.appQuery;
+  q.oninput = () => { state.appQuery = q.value; renderApps(); };
+  $("hero").replaceChildren(h(`<div class="big"><b>${state.apps.length}</b><span>${L("installed apps", "aplikasi terpasang")}</span></div>`), (() => {
+    const bar = h(`<div class="toolbar"></div>`);
+    bar.append(q);
+    return bar;
+  })());
+  setFooter(state.note ? [h(`<span>${esc(state.note)}</span>`)] : [], []);
+  renderApps();
+}
+
+function renderApps() {
+  const q = state.appQuery.trim().toLowerCase();
+  const list = state.apps.filter((a) => !q || (a.name + " " + a.publisher).toLowerCase().includes(q));
+  if (!list.length) {
+    $("content").innerHTML = `<div class="empty">${state.apps.length ? L("No match", "Tidak ada yang cocok") : L("No apps found", "Tidak ada aplikasi")}</div>`;
+    return;
+  }
+  $("content").replaceChildren(...list.map((a) => {
+    const meta = [a.version, a.publisher].filter(Boolean).join(" · ");
+    const row = h(`<div class="row click">
+      ${svg("apps", "ic")}
+      <div class="txt"><b>${esc(a.name)}</b><small>${esc(meta)}</small></div>
+      <span class="size">${a.size ? fmt(a.size) : ""}</span>
+      ${svg("chev", "chev")}
+    </div>`);
+    row.onclick = () => openApp(a);
+    return row;
+  }));
+}
+
+function openApp(info) {
+  state.app = { info, phase: "review", leftovers: null, sel: new Set() };
+  show("uninstall", true);
+}
+
+async function loadLeftovers() {
+  const ap = state.app;
+  const g = state.gen;
+  const items = await invoke("app_leftovers", { id: ap.info.id }).catch(() => []);
+  if (g !== state.gen || state.app !== ap) return;
+  ap.leftovers = items;
+  ap.sel = new Set(items.map((i) => i.path));
+  uninstallDetail();
+}
+
+function uninstallDetail() {
+  const ap = state.app;
+  const info = ap.info;
+  const left = ap.leftovers;
+  const total = (left || []).reduce((s, i) => s + i.size, 0);
+  const meta = [info.version, info.publisher].filter(Boolean).join(" · ");
+  $("hero").innerHTML = `<div class="big"><b style="font-size:22px">${esc(info.name)}</b><span>${esc(meta)}</span></div>`;
+
+  if (left === null) {
+    $("content").innerHTML = loading(L("Looking for leftover files…", "Mencari sisa file…"));
+    setFooter([button(L("Back", "Kembali"), backToApps)], []);
+    loadLeftovers();
+    return;
+  }
+
+  const rows = [];
+  rows.push(h(`<div class="group-head"><span>${ap.phase === "done" ? L("Leftover files", "Sisa file") : L("Will also be offered for removal", "Akan ditawarkan untuk dihapus")}</span><span>${left.length ? fmt(total) : ""}</span></div>`));
+  if (!left.length) rows.push(h(`<div class="empty">${L("No leftover files found", "Tidak ada sisa file")}</div>`));
+  for (const i of left) {
+    const row = h(`<div class="row click">
+      <input type="checkbox" class="cb">
+      ${svg("folder", "ic")}
+      <div class="txt"><b>${esc(i.name)}</b><small>${esc(i.path)}</small></div>
+      <span class="pill">${esc(i.place)}</span>
+      <span class="size">${fmt(i.size)}</span>
+    </div>`);
+    const cb = row.querySelector(".cb");
+    cb.checked = ap.sel.has(i.path);
+    row.onclick = (e) => {
+      if (e.target !== cb) cb.checked = !cb.checked;
+      cb.checked ? ap.sel.add(i.path) : ap.sel.delete(i.path);
+      uninstallDetail();
+    };
+    rows.push(row);
+  }
+  $("content").replaceChildren(...rows);
+
+  const selSize = left.filter((i) => ap.sel.has(i.path)).reduce((s, i) => s + i.size, 0);
+  if (ap.phase === "review") {
+    setFooter(
+      [button(L("Back", "Kembali"), backToApps)],
+      [button(L("Uninstall…", "Uninstall…"), runUninstall, true)],
+    );
+  } else {
+    setFooter(
+      [button(L("Done", "Selesai"), backToApps), ...(ap.note ? [h(`<span>${esc(ap.note)}</span>`)] : [])],
+      [button(selSize ? L(`Remove ${fmt(selSize)}`, `Hapus ${fmt(selSize)}`) : L("Remove", "Hapus"), removeLeftovers, true, !ap.sel.size)],
+    );
+  }
+}
+
+function backToApps() {
+  state.app = null;
+  state.apps = null; // the list changed if something was uninstalled
+  show("uninstall", true);
+}
+
+async function runUninstall() {
+  const ap = state.app;
+  if (!confirm(L(`Run the uninstaller for ${ap.info.name}?`, `Jalankan uninstaller untuk ${ap.info.name}?`))) return;
+  $("content").innerHTML = loading(L("Waiting for the uninstaller to finish…", "Menunggu uninstaller selesai…"));
+  setFooter([], []);
+  try {
+    const code = await invoke("run_uninstall", { id: ap.info.id });
+    ap.note = code === 0 ? "" : L(`The uninstaller exited with code ${code}`, `Uninstaller berakhir dengan kode ${code}`);
+  } catch (err) {
+    ap.note = String(err);
+  }
+  ap.phase = "done";
+  ap.leftovers = null; // look again: the uninstaller removes some of them itself
+  uninstallDetail();
+}
+
+async function removeLeftovers() {
+  const ap = state.app;
+  const paths = [...ap.sel];
+  if (!paths.length || !confirm(L(`Permanently delete ${paths.length} item(s)? This cannot be undone.`, `Hapus permanen ${paths.length} item? Tindakan ini tidak bisa dibatalkan.`))) return;
+  $("content").innerHTML = loading(L("Removing…", "Menghapus…"));
+  setFooter([], []);
+  const r = await invoke("delete_leftovers", { id: ap.info.id, paths });
+  ap.note = L(`Freed ${fmt(r.freed)}`, `${fmt(r.freed)} dibebaskan`) +
+    (r.failed.length ? L(` · ${r.failed.length} could not be removed`, ` · ${r.failed.length} gagal dihapus`) : "");
+  refreshDisk();
+  ap.leftovers = null;
+  uninstallDetail();
 }
 
 // ---------- analysis: shared toolbar ----------
@@ -391,7 +540,8 @@ function show(tab, keepNote = false) {
   $("content").innerHTML = "";
   $("content").scrollTop = 0;
   setFooter([], []);
-  ({ cleanup, usage, large, stale, dupes })[tab]();
+  if (tab !== "uninstall") state.app = null;
+  ({ cleanup, uninstall, usage, large, stale, dupes })[tab]();
 }
 
 (async () => {
