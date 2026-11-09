@@ -249,6 +249,7 @@ struct HomebrewView: View {
                    "CleanBro mencari brew di /opt/homebrew dan /usr/local."))
                 .foregroundStyle(.secondary)
             Button(L("Open brew.sh", "Buka brew.sh")) { NSWorkspace.shared.open(URL(string: "https://brew.sh")!) }
+                .accessibilityIdentifier("brew.openSite")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

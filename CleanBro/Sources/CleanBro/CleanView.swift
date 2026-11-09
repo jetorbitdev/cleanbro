@@ -28,6 +28,7 @@ struct CleanView: View {
                 .font(.system(size: 14)).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center).frame(maxWidth: 420)
             Button(L("Scan", "Pindai")) { model.startJunkScan() }
+                .accessibilityIdentifier("junk.scan")
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .padding(.top, 6)
@@ -80,8 +81,10 @@ struct CleanView: View {
             Divider()
             HStack(spacing: 10) {
                 Button(L("Rescan", "Pindai Ulang")) { model.startJunkScan() }
+                    .accessibilityIdentifier("junk.rescan")
                 Spacer()
                 Button(L("Clean \(Fmt.size(model.junkSelectedSize))", "Bersihkan \(Fmt.size(model.junkSelectedSize))")) { model.requestJunkClean() }
+                    .accessibilityIdentifier("junk.clean")
                     .buttonStyle(.borderedProminent)
                     .disabled(model.junkSelectedSize == 0)
                     .keyboardShortcut(.defaultAction)
@@ -123,8 +126,10 @@ struct CleanView: View {
             }
             HStack {
                 Button(L("Back", "Kembali")) { model.cleanPhase = .idle }
+                    .accessibilityIdentifier("junk.back")
                 if model.lastDeleteMode == .trash, (model.trashCount ?? 0) > 0 {
                     Button(L("Empty Trash…", "Kosongkan Sampah…")) { model.requestEmptyTrash() }
+                        .accessibilityIdentifier("junk.emptyTrash")
                 }
             }
             .padding(.top, 10)
@@ -152,6 +157,8 @@ struct JunkCategoryRow: View {
                 ))
                 .toggleStyle(.checkbox).labelsHidden()
                 .disabled(ids.isEmpty)
+                .accessibilityLabel(category.name)
+                .accessibilityIdentifier("junk.category.\(category.id)")
 
                 Image(systemName: category.icon)
                     .frame(width: 22).foregroundStyle(Color.accentTeal)
@@ -190,6 +197,7 @@ struct JunkCategoryRow: View {
                                 set: { on in if on { model.junkSelected.insert(item.path) } else { model.junkSelected.remove(item.path) } }
                             ))
                             .toggleStyle(.checkbox).labelsHidden()
+                            .accessibilityLabel(item.name)
                             Text(item.name).lineLimit(1).truncationMode(.middle)
                             Spacer()
                             Text(Fmt.size(item.size)).foregroundStyle(.secondary).monospacedDigit()

@@ -64,6 +64,7 @@ struct AppearanceToggle: View {
             Image(systemName: appearance.icon).frame(width: 18)
         }
         .buttonStyle(.borderless)
+        .accessibilityIdentifier("appearance.toggle")
         .help(L("Appearance: \(appearance.title) (click to change)", "Tampilan: \(appearance.title) (klik untuk ganti)"))
         .contextMenu { AppearancePicker() }
     }

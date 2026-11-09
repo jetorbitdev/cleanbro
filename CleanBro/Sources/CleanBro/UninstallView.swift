@@ -197,12 +197,15 @@ struct UninstallSheet: View {
                 }
                 HStack {
                     Toggle(L("Delete permanently (skip Trash)", "Hapus permanen (tidak lewat Sampah)"), isOn: $permanent).toggleStyle(.checkbox)
+                        .accessibilityIdentifier("uninstall.permanent")
                     Spacer()
                     Text(L("\(selected.count) \(selected.count == 1 ? "item" : "items") · \(Fmt.size(selected.reduce(0) { $0 + $1.size }))",
                            "\(selected.count) item · \(Fmt.size(selected.reduce(0) { $0 + $1.size }))"))
                         .foregroundStyle(.secondary).monospacedDigit()
                     Button(L("Cancel", "Batal")) { dismiss() }.keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("uninstall.cancel")
                     Button(L("Uninstall", "Uninstall")) { start(selected) }
+                        .accessibilityIdentifier("uninstall.confirm")
                         .buttonStyle(.borderedProminent).tint(.red)
                         .disabled(selected.isEmpty)
                         .keyboardShortcut(.defaultAction)
@@ -280,6 +283,7 @@ struct UninstallSheet: View {
                 .listStyle(.bordered).frame(maxHeight: 200)
             }
             Button(L("Close", "Tutup")) { dismiss() }.keyboardShortcut(.defaultAction)
+                .accessibilityIdentifier("uninstall.close")
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

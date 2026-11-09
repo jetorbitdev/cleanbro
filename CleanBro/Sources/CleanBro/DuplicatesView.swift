@@ -64,6 +64,7 @@ struct DuplicatesView: View {
                 .toggleStyle(.checkbox).font(.system(size: 12))
                 .help(L("Files inside are often duplicated on purpose; deleting them can break apps", "File di dalamnya sering sengaja kembar; menghapusnya bisa merusak aplikasi"))
             Button(L("Find Duplicates", "Cari Duplikat")) { model.startDupeScan() }
+                .accessibilityIdentifier("dupes.scan")
                 .buttonStyle(.borderedProminent).controlSize(.large)
                 .keyboardShortcut(.defaultAction)
                 .padding(.top, 6)
@@ -149,6 +150,7 @@ private struct DupeRow: View {
                 set: { on in if on { marked.insert(item.id) } else { marked.remove(item.id) } }
             ))
             .toggleStyle(.checkbox).labelsHidden()
+            .accessibilityLabel(item.name)
             KindBadge(item: item)
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.name).lineLimit(1).truncationMode(.middle)
@@ -200,6 +202,7 @@ private struct DupeBar: View {
                 Button(L("Uncheck All", "Hapus Semua Centang")) { marked.subtract(groups.flatMap(\.items).map(\.id)) }
             }
             .menuStyle(.borderlessButton)
+            .accessibilityIdentifier("dupes.autoSelect")
             .fixedSize()
             .disabled(groups.isEmpty)
             if wiped > 0 {
@@ -209,6 +212,7 @@ private struct DupeBar: View {
             }
             Spacer()
             Button(L("Rescan", "Pindai Ulang")) { model.startDupeScan() }
+                .accessibilityIdentifier("dupes.rescan")
             Button {
                 model.requestDelete(chosen, from: .dupes)
             } label: {
@@ -218,6 +222,7 @@ private struct DupeBar: View {
             .tint(.red)
             .disabled(chosen.isEmpty)
             .keyboardShortcut(.delete, modifiers: .command)
+            .accessibilityIdentifier("dupes.delete")
         }
         .font(.system(size: 13))
         .padding(.horizontal, 20).padding(.vertical, 12)

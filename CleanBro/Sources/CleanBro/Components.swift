@@ -77,7 +77,9 @@ struct AnalysisGate<Content: View>: View {
             }
             HStack {
                 Button(L("Choose Folder…", "Pilih Folder…")) { model.chooseFolder() }.controlSize(.large)
+                    .accessibilityIdentifier("analysis.chooseFolder")
                 Button(L("Scan", "Pindai")) { model.startAnalysis() }
+                    .accessibilityIdentifier("analysis.scan")
                     .buttonStyle(.borderedProminent).controlSize(.large)
                     .keyboardShortcut(.defaultAction)
             }
@@ -150,6 +152,7 @@ struct ItemTable: View {
                     set: { on in if on { marked.insert(item.id) } else { marked.remove(item.id) } }
                 ))
                 .toggleStyle(.checkbox).labelsHidden()
+                .accessibilityLabel(item.name)
             }
             .width(20)
 
@@ -265,6 +268,7 @@ struct SelectionBar: View {
             .disabled(visible.isEmpty)
             Spacer()
             Button(L("Show in Finder", "Tampilkan di Finder")) { model.reveal(chosen.map(\.path)) }
+                .accessibilityIdentifier("results.reveal")
                 .disabled(chosen.isEmpty)
             Button {
                 model.requestDelete(chosen, from: model.tool)
@@ -275,6 +279,7 @@ struct SelectionBar: View {
             .tint(.red)
             .disabled(chosen.isEmpty)
             .keyboardShortcut(.delete, modifiers: .command)
+            .accessibilityIdentifier("results.delete")
         }
         .font(.system(size: 13))
         .padding(.horizontal, 20).padding(.vertical, 12)
@@ -343,6 +348,7 @@ struct StopButton: View {
             }
         } else {
             Button(L("Stop & Show Results", "Berhenti & Tampilkan Hasil"), action: action)
+                .accessibilityIdentifier("scan.stop")
                 .keyboardShortcut(.cancelAction)
         }
     }
@@ -473,6 +479,7 @@ struct PartialBanner: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .help(text)
             Button(L("Full Scan", "Pindai Lengkap"), action: rescan)
+                .accessibilityIdentifier("analysis.fullScan")
                 .fixedSize()
         }
         .padding(10)

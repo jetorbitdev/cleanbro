@@ -638,6 +638,7 @@ struct HomeView: View {
             Toggle("", isOn: Binding(get: { isMarked(b) }, set: { _ in if let p = b.path { toggle(p) } }))
                 .toggleStyle(.checkbox).labelsHidden()
                 .disabled(!markable(b))
+                .accessibilityLabel(b.name)
                 .help(markable(b) ? L("Collect", "Kumpulkan") : L("Can't be deleted from here", "Tidak bisa dihapus dari sini"))
             RoundedRectangle(cornerRadius: 2.5)
                 .fill(b.color)

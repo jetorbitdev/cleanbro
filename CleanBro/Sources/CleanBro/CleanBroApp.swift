@@ -158,6 +158,7 @@ struct Sidebar: View {
 
     private func row(_ t: Tool, _ title: String, _ icon: String, _ meta: String) -> some View {
         SidebarRow(title: title, icon: icon, meta: meta, selected: model.tool == t) { model.tool = t }
+            .accessibilityIdentifier("sidebar.\(t.rawValue)")
     }
 }
 
@@ -279,6 +280,7 @@ struct VolumeBox: View {
                     .foregroundStyle(Theme.textTertiary).monospacedDigit()
                 Spacer(minLength: 4)
                 Button(L("Empty", "Kosongkan")) { model.requestEmptyTrash() }
+                    .accessibilityIdentifier("trash.empty")
                     .controlSize(.small)
                     .disabled(model.trashCount == 0 || model.isDeleting)
             }
