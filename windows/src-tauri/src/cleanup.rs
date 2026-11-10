@@ -2,8 +2,12 @@
 //! one item. The frontend only sends back paths; `clean_junk` re-derives the
 //! allowed roots and refuses anything that is not a direct child of one.
 
+use crate::jobs::Jobs;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::Ordering::Relaxed;
+use std::sync::Arc;
 
 const RECYCLE: &str = "recycle-bin:";
 
@@ -135,10 +139,21 @@ fn empty_recycle() -> Result<(), String> {
     Err("Recycle Bin is only available on Windows".into())
 }
 
+#[derive(Serialize)]
+pub struct JunkScan {
+    cats: Vec<JunkCategory>,
+    /// stopped by the user: only items that were fully measured
+    partial: bool,
+}
+
 #[tauri::command]
-pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        let mut cats = Vec::new();
+pub async fn scan_junk(jobs: tauri::State<'_, Arc<Jobs>>) -> Result<JunkScan, String> {
+    let jobs = jobs.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = &jobs.junk;
+        let Some(_running) = p.start() else { return Err("A scan is already running".into()) };
+        // list every candidate first, so progress has a total
+        let mut found: Vec<(&'static str, bool, Vec<(PathBuf, String)>)> = Vec::new();
         for d in defs() {
             let mut unreadable = false;
             let mut cands: Vec<(PathBuf, String)> = Vec::new();
@@ -170,24 +185,35 @@ pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
                     }
                 }
             }
-            // sequential on purpose: dir_size walks with jwalk, which runs on the
-            // global rayon pool and deadlocks when called from inside a rayon job
+            found.push((d.id, unreadable, cands));
+        }
+        p.total.store(found.iter().map(|f| f.2.len() as u64).sum::<u64>() + 1, Relaxed);
+
+        let mut cats = Vec::new();
+        for (id, unreadable, cands) in found {
             let mut items: Vec<JunkItem> = cands
-                .into_iter()
-                .map(|(p, name)| {
-                    let size = match std::fs::symlink_metadata(&p) {
-                        Ok(m) if m.is_dir() => crate::scan::dir_size(&p),
+                .into_par_iter()
+                .filter_map(|(path, name)| {
+                    if p.cancelled() {
+                        return None; // not measured: left out, not shown as 0
+                    }
+                    p.set_current(&path);
+                    let size = match std::fs::symlink_metadata(&path) {
+                        Ok(m) if m.is_dir() => crate::scan::dir_size(&path),
                         Ok(m) => m.len(),
                         Err(_) => 0,
                     };
-                    JunkItem { path: p.to_string_lossy().into_owned(), name, size }
+                    p.done.fetch_add(1, Relaxed);
+                    p.bytes.fetch_add(size, Relaxed);
+                    Some(JunkItem { path: path.to_string_lossy().into_owned(), name, size })
                 })
                 .filter(|i| i.size > 0)
                 .collect();
             items.sort_by(|a, b| b.size.cmp(&a.size));
-            cats.push(JunkCategory { id: d.id.into(), needs_access: unreadable, items });
+            cats.push(JunkCategory { id: id.into(), needs_access: unreadable, items });
         }
-        let rb = recycle_size();
+        let rb = if p.cancelled() { 0 } else { recycle_size() };
+        p.done.fetch_add(1, Relaxed);
         cats.push(JunkCategory {
             id: "recycle".into(),
             needs_access: false,
@@ -197,7 +223,7 @@ pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
                 vec![]
             },
         });
-        Ok(cats)
+        Ok(JunkScan { cats, partial: p.cancelled() })
     })
     .await
     .map_err(|e| e.to_string())?

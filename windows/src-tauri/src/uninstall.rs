@@ -2,6 +2,7 @@
 //! sends back an app `id`, and leftovers are re-derived on the backend, so a
 //! delete request can never name a path we did not offer.
 
+use rayon::prelude::*;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -195,9 +196,8 @@ fn leftovers_of(app: &RawApp) -> Vec<(PathBuf, &'static str)> {
 pub async fn app_leftovers(id: String) -> Vec<Leftover> {
     tauri::async_runtime::spawn_blocking(move || {
         let Some(app) = resolve(&id) else { return Vec::new() };
-        // sequential: dir_size uses the global rayon pool
         let mut v: Vec<Leftover> = leftovers_of(&app)
-            .into_iter()
+            .into_par_iter()
             .map(|(p, place)| Leftover {
                 size: crate::scan::dir_size(&p),
                 name: base_name(&p),
