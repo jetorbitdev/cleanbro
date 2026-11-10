@@ -111,8 +111,19 @@ const state = {
   homeCache: new Map(),
   marks: new Map(), // Home: path -> { name, size }
   dupe: freshDupes(),
-  sel: new Set(),
-  sizes: new Map(),
+  sel: new Set(), // checked paths
+  hl: new Set(), // highlighted rows (click / ctrl / shift), toggled with Space
+  anchor: -1,
+  visible: [], // rows the open table shows, for the selection bar
+  paint: null, // redraws the open table's visible rows
+  ro: null,
+  usageCache: null, // { path, items, info } of the Disk Usage folder
+  sort: { usage: { key: "size", dir: "desc" }, large: { key: "size", dir: "desc" }, stale: { key: "modified", dir: "asc" } },
+  f: {
+    large: { min: 100 << 20, kind: null, q: "" },
+    stale: { age: 12, min: 10 << 20, skipApp: true, q: "" },
+    dupes: { q: "" },
+  },
   note: "",
   apps: null,
   app: null, // the app being uninstalled: { info, phase, leftovers, sel }
@@ -578,6 +589,8 @@ async function startAnalysis(root = state.scan.root) {
   state.marks.clear();
   state.homeCache.clear();
   state.usagePath = null;
+  state.usageCache = null;
+  state.hl.clear();
   state.homeFocus = null;
   updateBadges();
   repaintFor("analysis");
@@ -1048,7 +1061,9 @@ async function trash(paths) {
     .map((g) => ({ ...g, wasted: g.size * (g.items.length - 1) }));
   for (const p of done) state.marks.delete(p);
   state.homeCache.clear();
+  state.usageCache = null;
   state.sel.clear();
+  state.hl.clear();
   toast(L(`${done.size} moved to the Recycle Bin`, `${done.size} dipindahkan ke Recycle Bin`) +
     (failed.length ? L(` · ${failed.length} failed`, ` · ${failed.length} gagal`) : ""));
   updateBadges();
@@ -1056,131 +1071,433 @@ async function trash(paths) {
   repaint();
 }
 
-// ---------- shared list pieces ----------
-function selFooter() {
-  const size = [...state.sel].reduce((s, p) => s + (state.sizes.get(p) || 0), 0);
-  setFooter([h(`<span>${state.sel.size ? L(`${state.sel.size} selected · ${fmt(size)}`, `${state.sel.size} dipilih · ${fmt(size)}`) : ""}</span>`)],
-    [button(L("Move to Recycle Bin…", "Pindahkan ke Recycle Bin…"), moveToBin, true, !state.sel.size)]);
+// ---------- file kinds ----------
+const KIND_EXT = {
+  video: "mp4 mkv avi mov wmv flv webm m4v mpg mpeg mts",
+  archive: "zip rar 7z tar gz tgz bz2 xz zst cab msi msix appx",
+  disk: "iso img vmdk vdi vhd vhdx qcow2 wim raw hdd",
+  image: "jpg jpeg png heic gif tif tiff psd cr2 cr3 nef arw dng webp bmp",
+  audio: "mp3 wav aif aiff flac m4a aac ogg wma",
+  document: "pdf doc docx xls xlsx ppt pptx odt ods epub",
+};
+const KIND = {
+  folder: { label: "Folder", color: "var(--accent-text)" },
+  video: { label: "Video", color: "#9b59b6" },
+  archive: { label: L("Archives & Installers", "Arsip & Installer"), color: "#e67e22" },
+  disk: { label: "Disk Image", color: "#3b82f6" },
+  image: { label: L("Images", "Gambar"), color: "#ec4899" },
+  audio: { label: "Audio", color: "#ef4444" },
+  document: { label: L("Documents", "Dokumen"), color: "#a16207" },
+  other: { label: L("Other", "Lainnya"), color: "#8e8e93" },
+};
+const EXT_KIND = {};
+for (const [k, list] of Object.entries(KIND_EXT)) for (const e of list.split(" ")) EXT_KIND[e] = k;
+const extOf = (name) => {
+  const i = name.lastIndexOf(".");
+  return i > 0 ? name.slice(i + 1).toLowerCase() : "";
+};
+const kindOf = (it) => (it.kind ??= it.isDir ? "folder" : EXT_KIND[extOf(it.name)] || "other");
+const badgeOf = (it) => (it.isDir ? "DIR" : extOf(it.name).slice(0, 4).toUpperCase() || "FILE");
+
+// ---------- sorting and dates ----------
+const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const FIRST_DIR = { name: "asc", modified: "desc", size: "desc" };
+function sortItems(items, s) {
+  const d = s.dir === "asc" ? 1 : -1;
+  const by = s.key === "name" ? (a, b) => coll.compare(a.name, b.name)
+    : s.key === "modified" ? (a, b) => a.modified - b.modified
+    : (a, b) => a.size - b.size;
+  return items.slice().sort((a, b) => by(a, b) * d || coll.compare(a.name, b.name));
 }
-async function moveToBin() {
-  const paths = [...state.sel];
+const rtf = new Intl.RelativeTimeFormat(ID ? "id" : "en", { numeric: "auto" });
+function fmtRel(s) {
+  if (!s) return "";
+  const days = Math.max(0, Math.round((Date.now() / 1000 - s) / 86400));
+  if (days < 30) return rtf.format(-days, "day");
+  if (days < 365) return rtf.format(-Math.round(days / 30), "month");
+  return rtf.format(-Math.round(days / 365), "year");
+}
+
+// ---------- toolbar pieces ----------
+function searchBox(value, onInput, placeholder) {
+  const i = h(`<input class="field search" type="search" spellcheck="false" placeholder="${esc(placeholder)}">`);
+  i.value = value;
+  i.oninput = () => onInput(i.value);
+  return i;
+}
+function segmented(options, current, onPick) {
+  const seg = h(`<div class="seg"></div>`);
+  for (const [v, t] of options) {
+    const b = h(`<button${v === current ? ' class="on"' : ""}>${esc(t)}</button>`);
+    b.onclick = () => {
+      seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      onPick(v);
+    };
+    seg.append(b);
+  }
+  return seg;
+}
+function toolbarEl(controls) {
+  const bar = h(`<div class="toolbar"></div>`);
+  bar.append(...controls, h(`<span class="grow"></span>`), ...scanTools());
+  return bar;
+}
+const bigEl = () => h(`<div class="big"><b>…</b><span></span></div>`);
+function setBig(big, size, text) {
+  big.innerHTML = `<b>${fmt(size)}</b><span>${esc(text)}</span>`;
+}
+/// Chips that redraw themselves; `onPick(value)` runs after the new one is set.
+function chipGroup(options, current, onPick) {
+  const wrap = h(`<span class="chips-inline"></span>`);
+  const draw = () => wrap.replaceChildren(...options.map(([v, t]) => chip(t, v === current, () => { current = v; draw(); onPick(v); })));
+  draw();
+  return wrap;
+}
+
+// ---------- context menu ----------
+function ctxMenu(x, y, entries) {
+  document.querySelector(".ctx")?.remove();
+  const m = h(`<div class="menu ctx"></div>`);
+  for (const e of entries) {
+    if (e === "-") { m.append(h(`<hr>`)); continue; }
+    const b = h(`<button${e.danger ? ' class="danger"' : ""}>${esc(e.label)}</button>`);
+    b.onclick = () => { m.remove(); e.run(); };
+    m.append(b);
+  }
+  document.body.append(m);
+  const r = m.getBoundingClientRect();
+  m.style.left = `${Math.max(4, Math.min(x, innerWidth - r.width - 8))}px`;
+  m.style.top = `${Math.max(4, Math.min(y, innerHeight - r.height - 8))}px`;
+  setTimeout(() => {
+    document.addEventListener("mousedown", (ev) => { if (!m.contains(ev.target)) m.remove(); }, { once: true });
+    document.addEventListener("keydown", () => m.remove(), { once: true });
+  }, 0);
+}
+
+// ---------- selection bar ----------
+function selFooter() {
+  const vis = state.visible;
+  const can = vis.filter((i) => !isProtected(i.path));
+  const chosen = vis.filter((i) => state.sel.has(i.path));
+  const total = chosen.reduce((s, i) => s + i.size, 0);
+  const all = can.length > 0 && can.every((i) => state.sel.has(i.path));
+  const left = h(`<div class="selinfo"><span>${L(`${chosen.length} selected`, `${chosen.length} dipilih`)}</span></div>`);
+  if (chosen.length) left.append(h(`<span class="dim">${fmt(total)}</span>`));
+  const link = h(`<button class="link"${can.length ? "" : " disabled"}>${all ? L("Deselect All", "Batal Pilih Semua") : L("Select All", "Pilih Semua")}</button>`);
+  link.onclick = () => {
+    for (const i of can) all ? state.sel.delete(i.path) : state.sel.add(i.path);
+    state.paint?.();
+    selFooter();
+  };
+  left.append(link);
+  const paths = chosen.map((i) => i.path);
+  setFooter([left], [
+    button(L("Show in Explorer", "Tampilkan di Explorer"), () => invoke("reveal", { paths }), false, !chosen.length),
+    button(L("Move to Recycle Bin…", "Pindahkan ke Recycle Bin…"), () => recycle(paths), true, !chosen.length),
+  ]);
+}
+async function recycle(paths) {
   if (!paths.length || !confirm(L(`Move ${paths.length} item(s) to the Recycle Bin?`, `Pindahkan ${paths.length} item ke Recycle Bin?`))) return;
   await trash(paths);
 }
 
-function fileRow(f, extra = "") {
-  state.sizes.set(f.path, f.size);
-  const row = h(`<div class="row click">
-    <input type="checkbox" class="cb">
-    ${svg("file", "ic")}
-    <div class="txt"><b>${esc(f.name)}</b><small>${esc(f.path)}</small></div>
-    ${extra}
-    <span class="meta">${fmtDate(f.modified)}</span>
-    <span class="size">${fmt(f.size)}</span>
-  </div>`);
-  const cb = row.querySelector(".cb");
-  cb.checked = state.sel.has(f.path);
-  row.onclick = (e) => {
-    if (e.target !== cb) cb.checked = !cb.checked;
-    cb.checked ? state.sel.add(f.path) : state.sel.delete(f.path);
+// ---------- sortable table (Name / Modified / Size, like ItemTable on macOS) ----------
+const ROW_H = 52, HEAD_H = 34, OVERSCAN = 600;
+
+/// Draws `entries` (items, or `{ head: group }` separators) into #content.
+/// Only the rows in view exist in the DOM, so a folder with 100k files stays fast.
+/// Options: tab (sort key), sortable, relative (second line with "2 years ago"),
+/// banners, empty (text), onSort, onOpen(item) for double-clicking a folder.
+function renderTable(o) {
+  const content = $("content");
+  content.onscroll = null;
+  state.ro?.disconnect();
+  const rows = o.entries;
+  const items = rows.filter((r) => !r.head);
+  state.visible = items;
+  const banners = o.banners || [];
+  content.classList.add("tight");
+  if (!items.length) {
+    state.paint = null;
+    content.replaceChildren(...banners, h(`<div class="empty">${esc(o.empty || "")}</div>`));
+    return;
+  }
+
+  const offs = [0];
+  for (const r of rows) offs.push(offs[offs.length - 1] + (r.head ? HEAD_H : ROW_H));
+  let maxSize = 1;
+  for (const it of items) if (it.size > maxSize) maxSize = it.size;
+  const idx = new Map(items.map((it, i) => [it.path, i]));
+  const byPath = new Map(items.map((it) => [it.path, it]));
+
+  const wrap = h(`<div class="table${o.relative ? " rel" : ""}" tabindex="0"></div>`);
+  if (o.sortable !== false) wrap.append(headerEl(o));
+  const body = h(`<div class="tbody"></div>`);
+  body.style.height = `${offs[rows.length]}px`;
+  wrap.append(body);
+  const scroll = content.scrollTop;
+  content.replaceChildren(...banners, wrap);
+  content.scrollTop = scroll;
+
+  const checkMany = (paths, on) => {
+    for (const p of paths) if (!isProtected(p)) on ? state.sel.add(p) : state.sel.delete(p);
+    paint();
     selFooter();
   };
-  return row;
+  const openItem = (it) => (it.isDir && o.onOpen ? o.onOpen(it) : invoke("reveal", { paths: [it.path] }));
+
+  const select = (it, e) => {
+    const k = idx.get(it.path);
+    if (e.shiftKey && state.anchor >= 0) {
+      const [a, b] = [state.anchor, k].sort((x, y) => x - y);
+      state.hl = new Set(items.slice(a, b + 1).map((x) => x.path));
+    } else if (e.ctrlKey || e.metaKey) {
+      state.hl.has(it.path) ? state.hl.delete(it.path) : state.hl.add(it.path);
+      state.anchor = k;
+    } else {
+      state.hl = new Set([it.path]);
+      state.anchor = k;
+    }
+    paint();
+  };
+
+  const menuFor = (it, e) => {
+    if (!state.hl.has(it.path)) { state.hl = new Set([it.path]); state.anchor = idx.get(it.path); paint(); }
+    const paths = [...state.hl];
+    const picked = paths.map((p) => byPath.get(p)).filter(Boolean);
+    const entries = [];
+    if (picked.length === 1 && picked[0].isDir && o.onOpen) entries.push({ label: L("Open Folder", "Buka Folder"), run: () => o.onOpen(picked[0]) });
+    entries.push(
+      { label: L("Show in Explorer", "Tampilkan di Explorer"), run: () => invoke("reveal", { paths }) },
+      "-",
+      { label: L("Check", "Centang"), run: () => checkMany(paths, true) },
+      { label: L("Uncheck", "Hapus Centang"), run: () => checkMany(paths, false) },
+      "-",
+      { label: L("Move to Recycle Bin…", "Pindahkan ke Recycle Bin…"), danger: true, run: () => recycle(paths.filter((p) => !isProtected(p))) },
+    );
+    ctxMenu(e.clientX, e.clientY, entries);
+  };
+
+  const itemRow = (it) => {
+    const k = KIND[kindOf(it)];
+    const protectedPath = isProtected(it.path);
+    const el = h(`<div class="trow${state.hl.has(it.path) ? " hl" : ""}">
+      <input type="checkbox" class="cb">
+      <div class="tname">
+        <span class="badge" style="--k:${k.color}">${esc(badgeOf(it))}</span>
+        <div class="tt"><b>${esc(it.name)}</b><small>${esc(parent(it.path))}</small></div>
+        ${it.keep ? `<span class="keep">${L("Oldest", "Terlama")}</span>` : ""}
+      </div>
+      <div class="tmod"><span>${esc(fmtDate(it.modified) || "—")}</span>${o.relative ? `<small>${esc(fmtRel(it.modified))}</small>` : ""}</div>
+      <div class="tsize"><b>${fmt(it.size)}</b><i><u style="width:${((it.size / maxSize) * 100).toFixed(1)}%"></u></i></div>
+    </div>`);
+    const cb = el.querySelector(".cb");
+    cb.checked = state.sel.has(it.path);
+    cb.disabled = protectedPath;
+    if (protectedPath) cb.title = L("Can't be deleted from here", "Tidak bisa dihapus dari sini");
+    cb.onclick = (ev) => {
+      ev.stopPropagation();
+      cb.checked ? state.sel.add(it.path) : state.sel.delete(it.path);
+      selFooter();
+    };
+    el.onclick = (ev) => {
+      if (ev.target === cb) return;
+      wrap.focus({ preventScroll: true });
+      select(it, ev);
+    };
+    el.ondblclick = (ev) => { if (ev.target !== cb) openItem(it); };
+    el.oncontextmenu = (ev) => { ev.preventDefault(); menuFor(it, ev); };
+    return el;
+  };
+
+  const at = (y) => { // first row whose bottom edge is below y
+    let lo = 0, hi = rows.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (offs[mid + 1] <= y) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+  };
+  let raf = 0;
+  function paint() {
+    raf = 0;
+    const y = content.getBoundingClientRect().top - body.getBoundingClientRect().top;
+    const bottom = y + content.clientHeight + OVERSCAN;
+    const els = [];
+    for (let i = at(Math.max(0, y - OVERSCAN)); i < rows.length && offs[i] < bottom; i++) {
+      const r = rows[i];
+      const el = r.head
+        ? h(`<div class="trow ghead"><span>${L(`${r.head.items.length} copies`, `${r.head.items.length} salinan`)}</span><span>${fmt(r.head.size)} ${L("each", "per file")}</span></div>`)
+        : itemRow(r);
+      el.style.top = `${offs[i]}px`;
+      el.style.height = `${offs[i + 1] - offs[i]}px`;
+      els.push(el);
+    }
+    body.replaceChildren(...els);
+  }
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(paint); };
+  content.onscroll = schedule;
+  state.ro = new ResizeObserver(schedule);
+  state.ro.observe(content);
+  state.paint = paint;
+
+  wrap.onkeydown = (e) => {
+    if (e.key !== " " || !state.hl.size) return;
+    e.preventDefault();
+    const paths = [...state.hl].filter((p) => !isProtected(p));
+    checkMany(paths, !paths.every((p) => state.sel.has(p)));
+  };
+  paint();
 }
 
-function fileList(items, label) {
-  const total = items.reduce((s, f) => s + f.size, 0);
-  $("hero").querySelector(".big").innerHTML = `<b>${fmt(total)}</b><span>${esc(label(items.length))}</span>`;
-  const head = partialBanner();
-  if (!items.length) { $("content").replaceChildren(...head, h(`<div class="empty">${L("Nothing found", "Tidak ada yang ditemukan")}</div>`)); return; }
-  $("content").replaceChildren(...head, ...items.slice(0, 500).map((f) => fileRow(f)));
-  if (items.length > 500) $("content").append(h(`<div class="empty">${L("Showing the 500 largest", "Menampilkan 500 terbesar")}</div>`));
-}
-
-function heroWith(controls) {
-  const bar = h(`<div class="toolbar"></div>`);
-  bar.append(...controls, h(`<span class="grow"></span>`), ...scanTools());
-  $("hero").replaceChildren(h(`<div class="big"><b>…</b><span></span></div>`), bar);
+function headerEl(o) {
+  const s = state.sort[o.tab];
+  const hd = h(`<div class="thead"></div>`);
+  hd.append(h(`<span></span>`));
+  for (const [key, title] of [["name", L("Name", "Nama")], ["modified", L("Modified", "Diubah")], ["size", L("Size", "Ukuran")]]) {
+    const on = s.key === key;
+    const c = h(`<button class="th ${key}${on ? " on" : ""}" title="${L("Sort by", "Urutkan berdasarkan")} ${esc(title)}">${esc(title)}${on ? `<em>${s.dir === "asc" ? "▲" : "▼"}</em>` : ""}</button>`);
+    c.onclick = () => {
+      state.sort[o.tab] = on ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: FIRST_DIR[key] };
+      $("content").scrollTop = 0;
+      o.onSort();
+    };
+    hd.append(c);
+  }
+  return hd;
 }
 
 // ---------- Disk Usage ----------
+function chainOf(root, path) {
+  const out = [{ title: root, path: root }];
+  if (samePath(path, root)) return out;
+  const r = root.replace(/[\\/]+$/, "");
+  const parts = path.slice(r.length + 1).split("\\");
+  parts.forEach((t, i) => out.push({ title: t, path: r + "\\" + parts.slice(0, i + 1).join("\\") }));
+  return out;
+}
+function openUsage(path) {
+  state.usagePath = samePath(path, state.scan.sum.root) ? null : path;
+  state.sel.clear();
+  state.hl.clear();
+  state.anchor = -1;
+  repaint();
+}
+
 async function usage() {
   if (!gate()) return;
   const g = state.gen;
   const root = state.scan.sum.root;
   const path = state.usagePath || root;
-  const up = h(`<button class="btn tool" title="${L("Parent folder", "Folder induk")}">${svg("up", "")}</button>`);
-  up.disabled = samePath(path, root);
-  up.onclick = () => { state.usagePath = parent(path); show("usage"); };
-  const where = h(`<span class="where">${esc(path)}</span>`);
-  heroWith([up, where]);
-  selFooter();
-  $("content").innerHTML = loading(L("Reading folder…", "Membaca folder…"));
-  const items = await invoke("tree_children", { path }).catch((e) => ({ error: String(e) }));
-  if (g !== state.gen) return;
-  if (items.error) { state.usagePath = null; $("content").innerHTML = `<div class="empty">${esc(items.error)}</div>`; return; }
-  const total = items.reduce((s, e) => s + e.size, 0);
-  const max = items[0]?.size || 1;
-  $("hero").querySelector(".big").innerHTML = `<b>${fmt(total)}</b><span>${L(`in ${items.length} items`, `dalam ${items.length} item`)}</span>`;
-  $("content").replaceChildren(...partialBanner(), ...items.map((e) => {
-    state.sizes.set(e.path, e.size);
-    const row = h(`<div class="row${e.is_dir ? " click" : ""}">
-      <input type="checkbox" class="cb">
-      ${svg(e.is_dir ? "folder" : "file", "ic")}
-      <div class="txt"><b>${esc(e.name)}</b></div>
-      <div class="usebar"><div style="width:${(e.size / max) * 100}%"></div></div>
-      <span class="size">${fmt(e.size)}</span>
-      ${e.is_dir ? svg("chev", "chev") : '<span style="width:14px"></span>'}
-    </div>`);
-    const cb = row.querySelector(".cb");
-    cb.checked = state.sel.has(e.path);
-    cb.disabled = isProtected(e.path);
-    cb.onclick = (ev) => {
-      ev.stopPropagation();
-      cb.checked ? state.sel.add(e.path) : state.sel.delete(e.path);
-      selFooter();
-    };
-    if (e.is_dir) row.onclick = () => { state.usagePath = e.path; show("usage"); };
-    return row;
-  }));
+  const chain = chainOf(root, path);
+
+  const back = h(`<button class="btn tool" title="${L("Back", "Kembali")}">${svg("back", "")}</button>`);
+  back.disabled = chain.length < 2;
+  back.onclick = () => openUsage(chain[chain.length - 2].path);
+  const crumbs = h(`<div class="crumbscroll"></div>`);
+  chain.forEach((c, i) => {
+    if (i) crumbs.append(h(`<span class="sep">›</span>`));
+    const b = h(`<button class="crumb${i === chain.length - 1 ? " on" : ""}">${esc(c.title)}</button>`);
+    b.onclick = () => openUsage(c.path);
+    crumbs.append(b);
+  });
+  const big = bigEl();
+  big.style.marginTop = "12px";
+  const bar = toolbarEl([back, crumbs]);
+  bar.style.marginTop = "0";
+  $("hero").replaceChildren(bar, big);
+  requestAnimationFrame(() => (crumbs.scrollLeft = crumbs.scrollWidth));
+
+  let data = state.usageCache?.path === path ? state.usageCache : null;
+  if (!data) {
+    setFooter([], []);
+    $("content").innerHTML = loading(L("Reading folder…", "Membaca folder…"));
+    const [kids, info] = await Promise.all([
+      invoke("tree_children", { path }).catch((e) => ({ error: String(e) })),
+      invoke("tree_info", { path }).catch(() => null),
+    ]);
+    if (g !== state.gen) return;
+    if (kids.error) { state.usagePath = null; $("content").innerHTML = `<div class="empty">${esc(kids.error)}</div>`; return; }
+    data = state.usageCache = { path, items: kids.map((e) => ({ ...e, isDir: e.is_dir })), info };
+  }
+
+  const size = data.info?.size ?? data.items.reduce((s, e) => s + e.size, 0);
+  const pct = data.info?.parent_size ? (size / data.info.parent_size) * 100 : null;
+  big.innerHTML = `<b>${fmt(size)}</b>` +
+    (pct != null ? `<span>${L(`${nf1.format(pct)}% of parent folder`, `${nf1.format(pct)}% dari folder induk`)}</span>` : "") +
+    `<span class="grow"></span>` +
+    (data.info?.modified ? `<small>${L("Last modified", "Terakhir berubah")} ${esc(fmtRel(data.info.modified))}</small>` : "");
+
+  const draw = () => {
+    renderTable({
+      tab: "usage", entries: sortItems(data.items, state.sort.usage), banners: partialBanner(),
+      onSort: draw, onOpen: (it) => openUsage(it.path),
+      empty: L("This folder is empty.", "Folder ini kosong."),
+    });
+    selFooter();
+  };
+  draw();
 }
 
-// ---------- Large / Stale ----------
+// ---------- Large files ----------
 function large() {
   if (!gate()) return;
-  const min = h(`<input type="number" min="1" value="100">`);
-  const opt = h(`<label>${L("At least", "Minimal")}</label>`);
-  opt.append(min, " MB");
-  heroWith([opt]);
-  selFooter();
-  const run = () => {
-    const m = Math.max(1, +min.value || 100) * (1 << 20);
-    fileList(state.files.filter((f) => f.size >= m), (n) => L(`in ${n} large files`, `dalam ${n} file besar`));
+  const f = state.f.large;
+  const needle = () => f.q.trim().toLowerCase();
+  const big = bigEl();
+  const draw = () => {
+    const q = needle();
+    const rows = state.files.filter((x) => x.size >= f.min && (!f.kind || kindOf(x) === f.kind) && (!q || x.name.toLowerCase().includes(q)));
+    setBig(big, rows.reduce((s, x) => s + x.size, 0), L(`in ${count(rows.length)} ${rows.length === 1 ? "file" : "files"}`, `dalam ${count(rows.length)} file`));
+    renderTable({
+      tab: "large", entries: sortItems(rows, state.sort.large), banners: partialBanner(), onSort: draw,
+      empty: L("No files match this filter.", "Tidak ada file yang cocok dengan filter ini."),
+    });
+    selFooter();
   };
-  min.onchange = run;
-  run();
+  const redraw = () => { $("content").scrollTop = 0; draw(); };
+  const kinds = [[null, L("All", "Semua")], ...["video", "archive", "disk", "image", "audio", "document", "other"].map((k) => [k, KIND[k].label])];
+  const chips = h(`<div class="chiprow"></div>`);
+  chips.append(chipGroup(kinds, f.kind, (v) => { f.kind = v; redraw(); }));
+  $("hero").replaceChildren(big, toolbarEl([
+    searchBox(f.q, (v) => { f.q = v; redraw(); }, L("Search file names", "Cari nama file")),
+    segmented([[50 << 20, "50 MB"], [100 << 20, "100 MB"], [500 << 20, "500 MB"], [1 << 30, "1 GB"]], f.min, (v) => { f.min = v; redraw(); }),
+  ]), chips);
+  draw();
 }
 
+// ---------- Not modified lately ----------
 function stale() {
   if (!gate()) return;
-  const age = h(`<select></select>`);
-  for (const [d, t] of [[180, L("6 months", "6 bulan")], [365, L("1 year", "1 tahun")], [730, L("2 years", "2 tahun")]]) age.add(new Option(t, d));
-  age.value = "365";
-  const min = h(`<input type="number" min="1" value="10">`);
-  const o1 = h(`<label>${L("Not modified for", "Tidak diubah selama")}</label>`);
-  o1.append(age);
-  const o2 = h(`<label>${L("At least", "Minimal")}</label>`);
-  o2.append(min, " MB");
-  heroWith([o1, o2]);
-  selFooter();
-  const run = () => {
-    const cutoff = Date.now() / 1000 - +age.value * 86400;
-    const m = Math.max(1, +min.value || 10) * (1 << 20);
-    fileList(state.files.filter((f) => f.modified < cutoff && f.size >= m).sort((a, b) => b.size - a.size),
-      (n) => L(`in ${n} stale files`, `dalam ${n} file lama`));
+  const f = state.f.stale;
+  const big = bigEl();
+  const appData = () => state.home + "\\AppData";
+  const draw = () => {
+    const q = f.q.trim().toLowerCase();
+    const cutoff = Date.now() / 1000 - f.age * 30.44 * 86400;
+    const rows = state.files.filter((x) => x.modified > 0 && x.modified < cutoff && x.size >= f.min &&
+      (!f.skipApp || !inside(x.path, appData())) && (!q || x.name.toLowerCase().includes(q)));
+    setBig(big, rows.reduce((s, x) => s + x.size, 0), L(`in ${count(rows.length)} ${rows.length === 1 ? "file" : "files"}`, `dalam ${count(rows.length)} file`));
+    renderTable({
+      tab: "stale", entries: sortItems(rows, state.sort.stale), banners: partialBanner(), relative: true, onSort: draw,
+      empty: L("No long-unmodified files match this filter.", "Tidak ada file yang lama tak berubah dengan filter ini."),
+    });
+    selFooter();
   };
-  age.onchange = min.onchange = run;
-  run();
+  const redraw = () => { $("content").scrollTop = 0; draw(); };
+  const ages = [[6, L("> 6 months", "> 6 bulan")], [12, L("> 1 year", "> 1 tahun")], [24, L("> 2 years", "> 2 tahun")], [36, L("> 3 years", "> 3 tahun")], [60, L("> 5 years", "> 5 tahun")]];
+  const skip = h(`<label class="check"><input type="checkbox" class="cb"> ${L("Skip AppData", "Lewati AppData")}</label>`);
+  skip.title = L("AppData holds app data that rarely changes but is still in use", "AppData berisi data aplikasi yang jarang berubah tapi masih dipakai");
+  const cb = skip.querySelector("input");
+  cb.checked = f.skipApp;
+  cb.onchange = () => { f.skipApp = cb.checked; redraw(); };
+  const chips = h(`<div class="chiprow"><span class="lbl">${L("Not modified", "Tidak diubah")}</span></div>`);
+  chips.append(chipGroup(ages, f.age, (v) => { f.age = v; redraw(); }), skip);
+  $("hero").replaceChildren(big, toolbarEl([
+    searchBox(f.q, (v) => { f.q = v; redraw(); }, L("Search names", "Cari nama")),
+    segmented([[1 << 20, "≥ 1 MB"], [10 << 20, "≥ 10 MB"], [100 << 20, "≥ 100 MB"], [1 << 30, "≥ 1 GB"]], f.min, (v) => { f.min = v; redraw(); }),
+  ]), chips);
+  draw();
 }
 
 // ---------- Duplicates ----------
@@ -1230,27 +1547,32 @@ function dupes() {
       onStop: () => invoke("cancel_job", { kind: "dupes" }),
     });
   }
-  const min = h(`<select></select>`);
-  for (const [v, t] of [[1 << 20, "≥ 1 MB"], [10 << 20, "≥ 10 MB"], [100 << 20, "≥ 100 MB"], [1 << 30, "≥ 1 GB"]]) min.add(new Option(t, v));
-  min.value = String(d.min);
-  min.title = L("Minimum size per file", "Ukuran minimal per file");
-  min.onchange = () => { d.min = +min.value; repaint(); };
-  const again = button(L("Search Again", "Cari Ulang"), () => { d.phase = "idle"; repaint(); });
-  heroWith([min, again]);
-  selFooter();
-  const groups = d.groups.filter((g) => g.size >= d.min);
-  const wasted = groups.reduce((s, x) => s + x.wasted, 0);
-  $("hero").querySelector(".big").innerHTML = `<b>${fmt(wasted)}</b><span>${L(`can be freed · ${groups.length} groups`, `bisa dihemat · ${groups.length} grup`)}</span>`;
-  const rows = [...partialBanner()];
-  if (d.partial) rows.push(banner(L("Search stopped. This list only contains groups that have finished matching.", "Pencarian dihentikan. Daftar ini hanya berisi grup yang sudah selesai dicocokkan."), startDupes));
-  if (!groups.length) {
-    rows.push(h(`<div class="empty">${d.groups.length ? L("No duplicates match this filter.", "Tidak ada duplikat yang cocok dengan filter ini.") : L("No duplicate files. 🎉", "Tidak ada file duplikat. 🎉")}</div>`));
-  }
-  for (const grp of groups.slice(0, 200)) {
-    rows.push(h(`<div class="group-head"><span>${L(`${grp.items.length} copies`, `${grp.items.length} salinan`)}</span><span>${fmt(grp.size)} ${L("each", "per file")}</span></div>`));
-    grp.items.forEach((f, i) => rows.push(fileRow(f, i === 0 ? `<span class="keep">${L("Oldest", "Terlama")}</span>` : "")));
-  }
-  $("content").replaceChildren(...rows);
+  const f = state.f.dupes;
+  const big = bigEl();
+  const draw = () => {
+    const q = f.q.trim().toLowerCase();
+    const groups = d.groups.filter((g) => g.size >= d.min && (!q || g.items.some((x) => x.name.toLowerCase().includes(q))));
+    setBig(big, groups.reduce((s, x) => s + x.wasted, 0), L(`can be freed · ${count(groups.length)} ${groups.length === 1 ? "group" : "groups"}`, `bisa dihemat · ${count(groups.length)} grup`));
+    const entries = [];
+    for (const g of groups) {
+      entries.push({ head: g });
+      g.items.forEach((x, i) => { x.keep = i === 0; entries.push(x); });
+    }
+    const banners = partialBanner();
+    if (d.partial) banners.push(banner(L("Search stopped. This list only contains groups that have finished matching.", "Pencarian dihentikan. Daftar ini hanya berisi grup yang sudah selesai dicocokkan."), startDupes));
+    renderTable({
+      tab: "dupes", entries, sortable: false, banners,
+      empty: d.groups.length ? L("No duplicates match this filter.", "Tidak ada duplikat yang cocok dengan filter ini.") : L("No duplicate files. 🎉", "Tidak ada file duplikat. 🎉"),
+    });
+    selFooter();
+  };
+  const redraw = () => { $("content").scrollTop = 0; draw(); };
+  $("hero").replaceChildren(big, toolbarEl([
+    searchBox(f.q, (v) => { f.q = v; redraw(); }, L("Search file names", "Cari nama file")),
+    segmented([[1 << 20, "≥ 1 MB"], [10 << 20, "≥ 10 MB"], [100 << 20, "≥ 100 MB"], [1 << 30, "≥ 1 GB"]], d.min, (v) => { d.min = v; redraw(); }),
+    button(L("Search Again", "Cari Ulang"), () => { d.phase = "idle"; repaint(); }),
+  ]));
+  draw();
 }
 
 // ---------- navigation ----------
@@ -1259,7 +1581,10 @@ const VIEWS = { home, cleanup, uninstall, usage, large, stale, dupes };
 function repaint() {
   state.gen++;
   $("hero").classList.remove("flush");
-  $("content").classList.remove("flush");
+  $("content").classList.remove("flush", "tight");
+  $("content").onscroll = null;
+  state.ro?.disconnect();
+  state.paint = null;
   VIEWS[state.tab]();
   updateBadges();
 }
@@ -1267,6 +1592,8 @@ function show(tab, keepNote = false) {
   state.tab = tab;
   if (!keepNote) state.note = "";
   state.sel.clear();
+  state.hl.clear();
+  state.anchor = -1;
   // the home map is about the whole disk (only when nothing was scanned yet)
   if (tab === "home" && state.scan.phase === "idle" && !state.scan.sum) state.scan.root = drive();
   document.querySelectorAll(".nav").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));

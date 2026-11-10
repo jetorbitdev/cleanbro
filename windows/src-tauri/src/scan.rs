@@ -65,6 +65,8 @@ pub(crate) fn dir_size(p: &Path) -> u64 {
 pub struct Node {
     name: Box<str>,
     size: u64,
+    /// newest modification time of any file inside (seconds, 0 = none)
+    modified: u64,
     children: Vec<Node>,
 }
 
@@ -85,12 +87,12 @@ fn build(dir: &Path, name: Box<str>, ctx: &Ctx, depth: usize, share: u64) -> Nod
     let p = ctx.progress;
     if p.cancelled() {
         p.done.fetch_add(share, Relaxed);
-        return Node { name, size: 0, children: Vec::new() };
+        return Node { name, size: 0, modified: 0, children: Vec::new() };
     }
     p.dirs.fetch_add(1, Relaxed);
     p.set_current(dir);
     let mut subdirs = Vec::new();
-    let (mut size, mut files) = (0u64, 0u64);
+    let (mut size, mut files, mut newest) = (0u64, 0u64, 0u64);
     let mut big = Vec::new();
     match fs::read_dir(dir) {
         Err(_) => {
@@ -108,6 +110,7 @@ fn build(dir: &Path, name: Box<str>, ctx: &Ctx, depth: usize, share: u64) -> Nod
                 } else if ft.is_file() {
                     size += m.len();
                     files += 1;
+                    newest = newest.max(crate::files::mtime(&m));
                     if m.len() >= BIG {
                         big.push(FileInfo::new(&e, &m));
                     }
@@ -139,8 +142,9 @@ fn build(dir: &Path, name: Box<str>, ctx: &Ctx, depth: usize, share: u64) -> Nod
         p.done.fetch_add(kept, Relaxed);
     }
     size += children.iter().map(|c| c.size).sum::<u64>();
+    let modified = children.iter().map(|c| c.modified).fold(newest, u64::max);
     children.sort_by(|a, b| b.size.cmp(&a.size));
-    Node { name, size, children }
+    Node { name, size, modified, children }
 }
 
 pub struct Analysis {
@@ -283,6 +287,8 @@ pub struct Entry {
     path: String,
     size: u64,
     is_dir: bool,
+    /// seconds since the Unix epoch; for a folder, its newest file
+    modified: u64,
     /// one more level, only when asked for (the Home treemap)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     children: Vec<Entry>,
@@ -300,6 +306,7 @@ fn entries(node: &Node, dir: &Path) -> Vec<Entry> {
             path: dir.join(&*c.name).to_string_lossy().into_owned(),
             size: c.size,
             is_dir: true,
+            modified: c.modified,
             children: Vec::new(),
         })
         .collect();
@@ -312,6 +319,7 @@ fn entries(node: &Node, dir: &Path) -> Vec<Entry> {
                     path: e.path().to_string_lossy().into_owned(),
                     size: m.len(),
                     is_dir: false,
+                    modified: crate::files::mtime(&m),
                     children: Vec::new(),
                 });
             }
@@ -348,6 +356,25 @@ pub async fn tree_children(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+pub struct Info {
+    size: u64,
+    modified: u64,
+    /// size of the folder above, within the scan (None for the scanned root)
+    parent_size: Option<u64>,
+}
+
+/// Size and newest file of one folder of the last analysis.
+#[tauri::command]
+pub fn tree_info(path: String, store: tauri::State<'_, Arc<Store>>) -> Result<Info, String> {
+    let guard = store.0.lock().unwrap();
+    let a = guard.as_ref().ok_or("Nothing scanned yet")?;
+    let dir = PathBuf::from(&path);
+    let node = a.find(&dir).ok_or_else(|| format!("Not in the last scan: {path}"))?;
+    let parent_size = if dir == a.root { None } else { dir.parent().and_then(|p| a.find(p)).map(|n| n.size) };
+    Ok(Info { size: node.size, modified: node.modified, parent_size })
 }
 
 // ---------- volume ----------

@@ -20,6 +20,7 @@ pub fn run() {
             scan::disk_info,
             scan::start_analysis,
             scan::tree_children,
+            scan::tree_info,
             cleanup::scan_junk,
             cleanup::clean_junk,
             uninstall::list_apps,

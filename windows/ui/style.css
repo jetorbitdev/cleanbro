@@ -349,3 +349,76 @@ input[type=number] { width: 72px; }
 }
 @keyframes fade { 0% { opacity: 0; } 8%, 85% { opacity: 1; } 100% { opacity: 0; } }
 .track > div.full { background: #e5484d; }
+
+/* ---------- sortable table (ItemTable on macOS) ---------- */
+.content.tight { padding-top: 0; }
+.table { outline: none; user-select: none; }
+.thead, .trow { grid-template-columns: 22px minmax(0, 1fr) 140px 110px; column-gap: 12px; }
+.thead {
+  position: sticky; top: 0; z-index: 2; display: grid; align-items: center; height: 34px; padding: 0 12px;
+  background: var(--canvas); border-bottom: 1px solid var(--border);
+}
+.th {
+  display: flex; align-items: center; gap: 4px; height: 100%; padding: 0; border: 0; background: none;
+  font-size: 12px; font-weight: 600; color: var(--text-2); cursor: pointer; white-space: nowrap;
+}
+.th:hover, .th.on { color: var(--text); }
+.th.size { justify-content: flex-end; }
+.th em { font-style: normal; font-size: 8px; color: var(--accent-text); }
+.tbody { position: relative; }
+.trow {
+  position: absolute; left: 0; right: 0; display: grid; align-items: center; padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle); cursor: default;
+}
+.trow:hover { background: var(--row-hover); }
+.trow.hl { background: var(--accent-subtle); }
+.trow.ghead {
+  display: flex; justify-content: space-between; align-items: flex-end; padding: 0 12px 6px;
+  font-size: 11px; font-weight: 600; color: var(--text-3); border-bottom: 0; background: none;
+}
+.tname { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.badge {
+  flex: none; width: 38px; height: 24px; display: grid; place-items: center; border-radius: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .4px; color: var(--k);
+  background: color-mix(in srgb, var(--k) 13%, transparent);
+}
+.tt { min-width: 0; }
+.tt b { display: block; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tt small { display: block; margin-top: 1px; font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tname .keep { flex: none; margin-left: auto; font-size: 11px; font-weight: 600; color: var(--accent-text); }
+.tmod { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.tmod small { display: block; margin-top: 1px; font-size: 11px; color: var(--text-2); }
+.table.rel .tmod > span { color: var(--text); }
+.tsize { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-variant-numeric: tabular-nums; }
+.tsize b { font-size: 13px; font-weight: 400; white-space: nowrap; }
+.tsize i { display: block; width: 64px; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.tsize u { display: block; height: 100%; background: var(--accent-bar); }
+
+/* filters in the hero */
+.field.search { flex: 0 1 220px; min-width: 140px; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 7px; overflow: hidden; }
+.seg button {
+  height: 26px; padding: 0 10px; border: 0; border-right: 1px solid var(--border); background: var(--control);
+  font-size: 12px; cursor: pointer;
+}
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: #fff; }
+.chiprow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.chiprow .lbl { font-size: 12px; color: var(--text-2); }
+.chiprow .check { display: flex; gap: 6px; align-items: center; margin-left: auto; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.chips-inline { display: contents; }
+.crumbscroll { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.crumbscroll::-webkit-scrollbar { display: none; }
+.crumbscroll .sep { color: var(--text-3); }
+.big small { margin-left: auto; font-size: 12px; color: var(--text-2); }
+
+/* selection bar */
+.selinfo { display: flex; gap: 10px; align-items: center; }
+.selinfo .dim { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.link { padding: 0; border: 0; background: none; color: var(--accent-text); cursor: pointer; }
+.link:disabled { opacity: .45; cursor: default; }
+
+/* context menu */
+.menu.ctx { position: fixed; right: auto; z-index: 30; }
+.menu button.danger { color: #d14343; }
+.menu button.danger:hover { color: #fff; background: #d14343; }

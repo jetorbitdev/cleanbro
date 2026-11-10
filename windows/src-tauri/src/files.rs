@@ -26,18 +26,22 @@ pub struct FileInfo {
     pub(crate) modified: u64,
 }
 
+/// Modification time in seconds since the Unix epoch (0 when unknown).
+pub(crate) fn mtime(m: &std::fs::Metadata) -> u64 {
+    m.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
 impl FileInfo {
     pub(crate) fn new(e: &std::fs::DirEntry, m: &std::fs::Metadata) -> Self {
         FileInfo {
             name: e.file_name().to_string_lossy().into_owned(),
             path: e.path().to_string_lossy().into_owned(),
             size: m.len(),
-            modified: m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0),
+            modified: mtime(m),
         }
     }
 }
