@@ -229,11 +229,15 @@ pub async fn trash_paths(paths: Vec<String>, store: tauri::State<'_, Arc<Store>>
             };
             match trash::delete(&p) {
                 Ok(()) => done.push((p, size, is_dir)),
+                // already gone (deleted since the last scan): nothing to trash, just forget it
+                Err(_) if std::fs::symlink_metadata(&p).is_err() => done.push((p, size, is_dir)),
                 Err(_) => failed.push(p),
             }
         }
         if let Some(a) = store.0.lock().unwrap().as_mut() {
             a.forget(&done);
+            // the saved scan must not bring the deleted items back
+            crate::snapshot::save(a);
         }
         failed
     })

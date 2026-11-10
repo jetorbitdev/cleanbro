@@ -24,6 +24,55 @@ const CAT = {
   recycle: { icon: "trash", name: L("Recycle Bin", "Recycle Bin") },
 };
 
+// ---------- advice: how safe an item is to delete (rules in advice.rs) ----------
+const LEVEL = {
+  safe: L("Safe to delete", "Aman dihapus"),
+  review: L("Check first", "Periksa dulu"),
+  keep: L("Keep", "Simpan"),
+};
+/// reason code -> [short label, explanation]
+const WHY = {
+  // safe
+  temp: [L("Temporary file", "File sementara"), L("Apps recreate temporary files when they need them.", "Aplikasi membuat ulang file sementara saat dibutuhkan.")],
+  cache: ["Cache", L("App cache. It is rebuilt automatically; the app may start a little slower once.", "Cache aplikasi. Dibuat ulang otomatis; aplikasi mungkin sedikit lebih lambat saat pertama dibuka.")],
+  "dev-cache": [L("Package cache", "Cache paket"), L("Developer tool cache. Packages are downloaded again when needed.", "Cache tool developer. Paket diunduh lagi saat dibutuhkan.")],
+  "crash-dump": ["Crash dump", L("Crash report. Only useful for debugging that crash.", "Laporan crash. Hanya berguna untuk men-debug crash tersebut.")],
+  log: ["Log", L("Log file. Apps start a new one.", "File log. Aplikasi akan membuat yang baru.")],
+  "partial-download": [L("Unfinished download", "Unduhan tak selesai"), L("A download that never finished.", "Unduhan yang tidak pernah selesai.")],
+  installer: ["Installer", L("Installer in Downloads. It can be downloaded again.", "Installer di Downloads. Bisa diunduh lagi.")],
+  unwanted: [L("Often unneeded", "Sering tak dibutuhkan"), L("Bundled or tune-up software most people never asked for.", "Software bawaan atau tune-up yang jarang benar-benar dibutuhkan.")],
+  // review
+  downloading: [L("Downloading?", "Sedang diunduh?"), L("Changed within the last day: the download may still be running.", "Berubah dalam sehari terakhir: unduhan mungkin masih berjalan.")],
+  "new-installer": [L("New installer", "Installer baru"), L("Less than 2 weeks old. Delete it once the app is installed.", "Umurnya kurang dari 2 minggu. Hapus setelah aplikasinya terpasang.")],
+  "windows-old": [L("Old Windows", "Windows lama"), L("Previous Windows installation. Remove it with Windows' Disk Cleanup instead.", "Instalasi Windows sebelumnya. Hapus lewat Disk Cleanup milik Windows.")],
+  "vm-disk": [L("VM disk", "Disk VM"), L("Virtual machine disk. Deleting it destroys that virtual machine.", "Disk mesin virtual. Menghapusnya menghilangkan mesin virtual tersebut.")],
+  "node-modules": [L("Dependencies", "Dependensi"), L("Project dependencies. They can be reinstalled, but the project won't run until then.", "Dependensi proyek. Bisa dipasang ulang, tapi proyek tidak jalan sampai dipasang lagi.")],
+  cloud: [L("Cloud-synced", "Tersinkron cloud"), L("In a synced folder. Deleting it here also deletes it from the cloud and your other devices.", "Ada di folder sinkron. Menghapus di sini juga menghapusnya dari cloud dan perangkat lain.")],
+  "app-data": [L("App data", "Data aplikasi"), L("Belongs to an app. Deleting it may reset the app or lose its data.", "Milik sebuah aplikasi. Menghapusnya bisa mereset aplikasi atau menghilangkan datanya.")],
+  "download-archive": [L("Downloaded archive", "Arsip unduhan"), L("Archive or disk image in Downloads. Fine to delete once you have extracted or used it.", "Arsip atau disk image di Downloads. Boleh dihapus kalau sudah diekstrak atau dipakai.")],
+  personal: [L("Personal file", "File pribadi"), L("Looks like a personal file. Only you can tell whether you still need it.", "Tampaknya file pribadi. Hanya Anda yang tahu masih perlu atau tidak.")],
+  old: [L("Long untouched", "Lama tak diubah"), L("Not modified in over 2 years. Check what it is before deleting.", "Tidak diubah lebih dari 2 tahun. Cek dulu isinya sebelum dihapus.")],
+  unknown: [L("Unknown", "Tak dikenal"), L("CleanBro doesn't recognize this. Check what it is before deleting.", "CleanBro tidak mengenali ini. Cek dulu isinya sebelum dihapus.")],
+  // keep
+  windows: ["Windows", L("Part of Windows. Deleting it can stop Windows from working.", "Bagian dari Windows. Menghapusnya bisa membuat Windows bermasalah.")],
+  "installed-app": [L("Installed app", "Aplikasi terpasang"), L("Part of an installed app. Remove the app in Uninstall Apps instead.", "Bagian dari aplikasi terpasang. Hapus aplikasinya lewat Uninstall Aplikasi.")],
+  "app-shared": [L("App data", "Data aplikasi"), L("Data shared by installed apps.", "Data bersama milik aplikasi terpasang.")],
+  "other-user": [L("Other user", "Pengguna lain"), L("Belongs to another user account on this PC.", "Milik akun pengguna lain di PC ini.")],
+  profile: [L("Profile folder", "Folder profil"), L("A standard folder of your profile. Delete what is inside it, not the folder.", "Folder standar profil Anda. Hapus isinya, bukan foldernya.")],
+  keys: [L("Keys & sign-ins", "Kunci & login"), L("Keys and sign-in data of command line tools. Deleting it can lock you out of servers or services.", "Kunci dan data login tool command line. Menghapusnya bisa membuat Anda tidak bisa masuk ke server atau layanan.")],
+  git: [L("Git history", "Riwayat Git"), L("Git repository data. Deleting it loses the project's history.", "Data repositori Git. Menghapusnya menghilangkan riwayat proyek.")],
+  mailbox: [L("Mailbox", "Kotak surat"), L("Outlook mailbox. Deleting it can lose your mail.", "Kotak surat Outlook. Menghapusnya bisa menghilangkan email Anda.")],
+  "wsl-docker": ["WSL / Docker", L("Disk of WSL or Docker. It holds every file of your Linux distros or containers.", "Disk WSL atau Docker. Berisi semua file distro Linux atau container Anda.")],
+  runtime: ["Runtime", L("Shared runtime. Other apps may stop working without it.", "Runtime bersama. Aplikasi lain bisa berhenti berfungsi tanpanya.")],
+  driver: ["Driver", L("Hardware driver. A device may stop working without it.", "Driver hardware. Perangkat bisa berhenti berfungsi tanpanya.")],
+  "windows-part": [L("Part of Windows", "Bagian Windows"), L("Comes with Windows, which keeps it up to date.", "Bawaan Windows dan diperbarui oleh Windows.")],
+};
+/// The advice of a row; duplicates only carry a path, so theirs comes from the scan's file list.
+const adviceOf = (it) => it.advice || state.adv.get(it.path);
+const whyText = (a) => `${LEVEL[a.level]}. ${(WHY[a.why] || [])[1] || ""}`.trim();
+const advPill = (a) => (a ? `<span class="adv ${a.level}" title="${esc(whyText(a))}">${esc((WHY[a.why] || [a.why])[0])}</span>` : "");
+const ADV_CHIPS = [[null, L("All", "Semua")], ...["safe", "review", "keep"].map((l) => [l, LEVEL[l]])];
+
 // ---------- icons (lucide-style strokes) ----------
 const ICONS = {
   house: '<path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/>',
@@ -44,6 +93,7 @@ const ICONS = {
   refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
   warn: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/>',
   back: '<path d="M15 6l-6 6 6 6"/>',
+  external: '<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
   chev: '<path d="M9 6l6 6-6 6"/>',
   up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
 };
@@ -118,10 +168,11 @@ const state = {
   paint: null, // redraws the open table's visible rows
   ro: null,
   usageCache: null, // { path, items, info } of the Disk Usage folder
-  sort: { usage: { key: "size", dir: "desc" }, large: { key: "size", dir: "desc" }, stale: { key: "modified", dir: "asc" } },
+  adv: new Map(), // path -> advice, for the files of the last scan
+  sort: { apps: { key: "name", dir: "asc" }, usage: { key: "size", dir: "desc" }, large: { key: "size", dir: "desc" }, stale: { key: "modified", dir: "asc" } },
   f: {
-    large: { min: 100 << 20, kind: null, q: "" },
-    stale: { age: 12, min: 10 << 20, skipApp: true, q: "" },
+    large: { min: 100 << 20, kind: null, adv: null, q: "" },
+    stale: { age: 12, min: 10 << 20, skipApp: true, adv: null, q: "" },
     dupes: { q: "" },
   },
   note: "",
@@ -140,6 +191,17 @@ function button(text, onClick, primary = false, disabled = false) {
   b.onclick = onClick;
   return b;
 }
+/// OK / Cancel box. The dialog plugin replaces window.confirm with an async one
+/// (a Promise, which is always truthy), so it has to be awaited. If the box can't
+/// be shown the answer is no: a failed prompt must never delete anything.
+async function ask(text) {
+  try {
+    return (await window.confirm(text)) === true;
+  } catch {
+    return false;
+  }
+}
+
 function toast(text) {
   const t = h(`<div class="toast">${esc(text)}</div>`);
   document.body.append(t);
@@ -386,7 +448,7 @@ function renderCleanup() {
 async function runClean() {
   const paths = [...state.junkSel];
   if (!paths.length) return;
-  if (!confirm(L(`Permanently delete ${paths.length} item(s)? This cannot be undone.`, `Hapus permanen ${paths.length} item? Tindakan ini tidak bisa dibatalkan.`))) return;
+  if (!await ask(L(`Permanently delete ${paths.length} item(s)? This cannot be undone.`, `Hapus permanen ${paths.length} item? Tindakan ini tidak bisa dibatalkan.`))) return;
   $("content").innerHTML = loading(L("Cleaning…", "Membersihkan…"));
   setFooter([], []);
   const r = await invoke("clean_junk", { paths }).catch((e) => ({ freed: 0, failed: [[paths[0], String(e)]] }));
@@ -427,6 +489,7 @@ async function uninstall() {
     if (g !== state.gen) return;
     state.apps = apps;
   }
+  $("content").classList.add("tight"); // the sortable header sticks to the top
   const q = h(`<input class="field" spellcheck="false" placeholder="${L("Search apps", "Cari aplikasi")}">`);
   q.value = state.appQuery;
   q.oninput = () => { state.appQuery = q.value; renderApps(); };
@@ -439,22 +502,49 @@ async function uninstall() {
   renderApps();
 }
 
+/// Clickable Name / Publisher / Size headers, like the scan result tables.
+function appHeader() {
+  const s = state.sort.apps;
+  const hd = h(`<div class="thead apphead"></div>`);
+  hd.append(h(`<span></span>`));
+  for (const [key, title] of [["name", L("Name", "Nama")], ["publisher", L("Publisher", "Penerbit")], ["size", L("Size", "Ukuran")]]) {
+    const on = s.key === key;
+    const c = h(`<button class="th ${key}${on ? " on" : ""}" title="${L("Sort by", "Urutkan berdasarkan")} ${esc(title)}">${esc(title)}${on ? `<em>${s.dir === "asc" ? "▲" : "▼"}</em>` : ""}</button>`);
+    c.onclick = () => {
+      state.sort.apps = on ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: FIRST_DIR[key] };
+      $("content").scrollTop = 0;
+      renderApps();
+    };
+    hd.append(c);
+  }
+  hd.append(h(`<span></span>`), h(`<span></span>`));
+  return hd;
+}
+
+/// Opens the app's install folder in Explorer, when the registry records one.
+async function revealApp(info) {
+  const ok = await invoke("reveal_app", { id: info.id }).catch(() => false);
+  if (!ok) toast(L("This app doesn't record an install folder", "Aplikasi ini tidak mencatat folder instalasinya"));
+}
+
 function renderApps() {
   const q = state.appQuery.trim().toLowerCase();
-  const list = state.apps.filter((a) => !q || (a.name + " " + a.publisher).toLowerCase().includes(q));
+  const list = sortItems(state.apps.filter((a) => !q || (a.name + " " + a.publisher).toLowerCase().includes(q)), state.sort.apps);
   if (!list.length) {
     $("content").innerHTML = `<div class="empty">${state.apps.length ? L("No match", "Tidak ada yang cocok") : L("No apps found", "Tidak ada aplikasi")}</div>`;
     return;
   }
-  $("content").replaceChildren(...list.map((a) => {
-    const meta = [a.version, a.publisher].filter(Boolean).join(" · ");
-    const row = h(`<div class="row click">
+  $("content").replaceChildren(appHeader(), ...list.map((a) => {
+    const row = h(`<div class="row click approw">
       ${svg("apps", "ic")}
-      <div class="txt"><b>${esc(a.name)}</b><small>${esc(meta)}</small></div>
+      <div class="txt"><b>${esc(a.name)}</b><small>${esc(a.version)}${advPill(a.advice)}</small></div>
+      <span class="meta pub">${esc(a.publisher)}</span>
       <span class="size">${a.size ? fmt(a.size) : ""}</span>
+      <button class="iconbtn" title="${L("Show install folder in Explorer", "Tampilkan folder instalasi di Explorer")}">${svg("external", "")}</button>
       ${svg("chev", "chev")}
     </div>`);
     row.onclick = () => openApp(a);
+    row.querySelector(".iconbtn").onclick = (e) => { e.stopPropagation(); revealApp(a); };
     return row;
   }));
 }
@@ -480,7 +570,17 @@ function uninstallDetail() {
   const left = ap.leftovers;
   const total = (left || []).reduce((s, i) => s + i.size, 0);
   const meta = [info.version, info.publisher].filter(Boolean).join(" · ");
-  $("hero").innerHTML = `<div class="big"><b style="font-size:22px">${esc(info.name)}</b><span>${esc(meta)}</span></div>`;
+  // Back is always reachable here: while looking for leftovers, while the uninstaller runs, and after
+  const back = h(`<button class="btn tool" title="${L("Back to the app list", "Kembali ke daftar aplikasi")}">${svg("back", "")}<span>${L("Apps", "Aplikasi")}</span></button>`);
+  back.onclick = backToApps;
+  const bar = h(`<div class="toolbar"></div>`);
+  bar.style.marginTop = "0";
+  const where = h(`<button class="btn tool" title="${L("Show the install folder in Explorer", "Tampilkan folder instalasi di Explorer")}">${svg("external", "")}<span>${L("Show in Explorer", "Tampilkan di Explorer")}</span></button>`);
+  where.onclick = () => revealApp(info);
+  bar.append(back, where);
+  const title = h(`<div class="big"><b style="font-size:22px">${esc(info.name)}</b><span>${esc(meta)}</span></div>`);
+  title.style.marginTop = "12px";
+  $("hero").replaceChildren(bar, title);
 
   if (left === null) {
     $("content").innerHTML = loading(L("Looking for leftover files…", "Mencari sisa file…"));
@@ -499,7 +599,9 @@ function uninstallDetail() {
       <div class="txt"><b>${esc(i.name)}</b><small>${esc(i.path)}</small></div>
       <span class="pill">${esc(i.place)}</span>
       <span class="size">${fmt(i.size)}</span>
+      <button class="iconbtn" title="${L("Show in Explorer", "Tampilkan di Explorer")}">${svg("external", "")}</button>
     </div>`);
+    row.querySelector(".iconbtn").onclick = (e) => { e.stopPropagation(); invoke("reveal", { paths: [i.path] }); };
     const cb = row.querySelector(".cb");
     cb.checked = ap.sel.has(i.path);
     row.onclick = (e) => {
@@ -519,7 +621,7 @@ function uninstallDetail() {
     );
   } else {
     setFooter(
-      [button(L("Done", "Selesai"), backToApps), ...(ap.note ? [h(`<span>${esc(ap.note)}</span>`)] : [])],
+      [button(L("Back to Apps", "Kembali ke Aplikasi"), backToApps), ...(ap.note ? [h(`<span>${esc(ap.note)}</span>`)] : [])],
       [button(selSize ? L(`Remove ${fmt(selSize)}`, `Hapus ${fmt(selSize)}`) : L("Remove", "Hapus"), removeLeftovers, true, !ap.sel.size)],
     );
   }
@@ -533,7 +635,9 @@ function backToApps() {
 
 async function runUninstall() {
   const ap = state.app;
-  if (!confirm(L(`Run the uninstaller for ${ap.info.name}?`, `Jalankan uninstaller untuk ${ap.info.name}?`))) return;
+  // a driver or a runtime: say what depends on it before asking
+  const warn = ap.info.advice?.level === "keep" ? `\n\n${whyText(ap.info.advice)}` : "";
+  if (!await ask(L(`Run the uninstaller for ${ap.info.name}?`, `Jalankan uninstaller untuk ${ap.info.name}?`) + warn)) return;
   $("content").innerHTML = loading(L("Waiting for the uninstaller to finish…", "Menunggu uninstaller selesai…"));
   setFooter([], []);
   try {
@@ -541,6 +645,12 @@ async function runUninstall() {
     ap.note = code === 0 ? "" : L(`The uninstaller exited with code ${code}`, `Uninstaller berakhir dengan kode ${code}`);
   } catch (err) {
     ap.note = String(err);
+  }
+  if (state.app !== ap) {
+    // the user went back to the list while the uninstaller ran: the list is out of date now
+    state.apps = null;
+    if (state.tab === "uninstall") repaint();
+    return;
   }
   ap.phase = "done";
   ap.leftovers = null; // look again: the uninstaller removes some of them itself
@@ -550,13 +660,14 @@ async function runUninstall() {
 async function removeLeftovers() {
   const ap = state.app;
   const paths = [...ap.sel];
-  if (!paths.length || !confirm(L(`Permanently delete ${paths.length} item(s)? This cannot be undone.`, `Hapus permanen ${paths.length} item? Tindakan ini tidak bisa dibatalkan.`))) return;
+  if (!paths.length || !await ask(L(`Permanently delete ${paths.length} item(s)? This cannot be undone.`, `Hapus permanen ${paths.length} item? Tindakan ini tidak bisa dibatalkan.`))) return;
   $("content").innerHTML = loading(L("Removing…", "Menghapus…"));
   setFooter([], []);
   const r = await invoke("delete_leftovers", { id: ap.info.id, paths });
   ap.note = L(`Freed ${fmt(r.freed)}`, `${fmt(r.freed)} dibebaskan`) +
     (r.failed.length ? L(` · ${r.failed.length} could not be removed`, ` · ${r.failed.length} gagal dihapus`) : "");
   refreshDisk();
+  if (state.app !== ap) return; // the user went back to the list meanwhile
   ap.leftovers = null;
   uninstallDetail();
 }
@@ -577,8 +688,39 @@ const largeStats = () => (state.files || []).reduce((a, f) => (f.size >= 100 << 
 async function chooseFolder() {
   const picked = await invoke("plugin:dialog|open", {
     options: { directory: true, defaultPath: state.scan.root || state.home, title: L("Choose a folder or drive to analyze", "Pilih folder atau drive yang ingin dianalisis") },
-  }).catch(() => null);
+  }).catch((e) => { toast(L("Couldn't open the folder picker: ", "Tidak bisa membuka pemilih folder: ") + e); return null; });
   if (typeof picked === "string" && picked) startAnalysis(picked);
+}
+
+/// Makes a finished scan (just run, or loaded from the last session) the one every analysis tool shows.
+function adoptScan(r, progress = null) {
+  state.scan = { phase: "done", root: r.root, sum: r, progress, error: "" };
+  state.files = r.big;
+  state.adv = new Map(r.big.map((f) => [f.path, f.advice]));
+}
+
+/// "3 hours ago" for the time a scan ended; days and longer reuse fmtRel.
+function fmtAgo(s) {
+  if (!s) return "";
+  const secs = Math.max(0, Date.now() / 1000 - s);
+  if (secs < 60) return L("just now", "baru saja");
+  if (secs < 3600) return rtf.format(-Math.round(secs / 60), "minute");
+  if (secs < 86400) return rtf.format(-Math.round(secs / 3600), "hour");
+  return fmtRel(s);
+}
+
+/// When the results on screen were scanned, and a way to refresh them. They can
+/// be from an earlier session, so what is on disk may have changed since.
+function scanStamp() {
+  const at = state.scan.sum?.at;
+  if (!at) return [];
+  const age = h(`<span class="scanage${Date.now() / 1000 - at > 7 * 86400 ? " old" : ""}"></span>`);
+  age.textContent = L("Scanned ", "Dipindai ") + fmtAgo(at);
+  age.title = new Date(at * 1000).toLocaleString(ID ? "id-ID" : undefined);
+  const re = h(`<button class="btn tool">${svg("refresh", "")}<span>${L("Update", "Perbarui")}</span></button>`);
+  re.title = L("Scan again to update these results", "Pindai ulang untuk memperbarui hasil ini");
+  re.onclick = () => startAnalysis(state.scan.sum?.root || state.scan.root);
+  return [age, re];
 }
 
 async function startAnalysis(root = state.scan.root) {
@@ -598,10 +740,12 @@ async function startAnalysis(root = state.scan.root) {
   const stop = poll("analysis", (p) => { job.progress = p; repaintFor("analysis", true); });
   const r = await invoke("start_analysis", { root }).catch((e) => ({ error: String(e) }));
   stop();
-  state.scan = r.error
-    ? { phase: "idle", root, sum: null, progress: null, error: r.error }
-    : { phase: "done", root: r.root, sum: r, progress: job.progress, error: "" };
-  state.files = r.error ? null : r.big;
+  if (r.error) {
+    state.scan = { phase: "idle", root, sum: null, progress: null, error: r.error };
+    state.files = null;
+  } else {
+    adoptScan(r, job.progress);
+  }
   updateBadges();
   refreshDisk();
   repaintFor("analysis");
@@ -648,7 +792,7 @@ function gate(keepHero = false) {
 /// Shown above results of a scan the user stopped.
 function partialBanner() {
   if (!state.scan.sum?.partial) return [];
-  const p = state.scan.progress || { dirs: 0, files: 0 };
+  const p = state.scan.sum; // the counts are saved with the scan, so this also holds after a restart
   return [banner(L(`Scan stopped. Results only include the ${count(p.dirs)} folders and ${count(p.files)} files read so far. Sizes are incomplete.`,
     `Pemindaian dihentikan. Hasil hanya mencakup ${count(p.dirs)} folder dan ${count(p.files)} file yang sudah dibaca. Ukuran belum lengkap.`), () => startAnalysis())];
 }
@@ -674,9 +818,7 @@ function scanTools() {
     if (!menu.hidden) document.addEventListener("click", () => (menu.hidden = true), { once: true });
   };
   wrap.append(pick, menu);
-  const re = h(`<button class="btn tool" title="${L("Rescan", "Pindai ulang")}">${svg("refresh", "")}<span>${L("Rescan", "Pindai Ulang")}</span></button>`);
-  re.onclick = () => startAnalysis(state.scan.sum?.root || state.scan.root);
-  return [wrap, re];
+  return [wrap, ...scanStamp()];
 }
 
 // ---------- Home ----------
@@ -869,7 +1011,10 @@ function homeHeader(focus) {
     b.onclick = () => { state.homeFocus = c.focus; repaint(); };
     head.append(b);
   });
-  head.append(h(`<span class="grow"></span>`), h(`<span class="vol">${v ? L(`${fmt(used)} of ${fmt(v.total)}`, `${fmt(used)} dari ${fmt(v.total)}`) : ""}</span>`));
+  // with a scan on screen, the folder picker and Update live here too: Home is the first screen
+  head.append(h(`<span class="grow"></span>`),
+    h(`<span class="vol">${v ? L(`${fmt(used)} of ${fmt(v.total)}`, `${fmt(used)} dari ${fmt(v.total)}`) : ""}</span>`),
+    ...(state.scan.phase === "done" ? scanTools() : []));
 
   const cards = h(`<div class="cards"></div>`);
   const frac = v && v.total ? used / v.total : 0;
@@ -1043,7 +1188,7 @@ function collectBar() {
     button(L("Show in Explorer", "Tampilkan di Explorer"), () => invoke("reveal", { paths: items.map((i) => i.path) }), false, !items.length),
     button(L("Clear", "Kosongkan"), () => { state.marks.clear(); repaint(); }, false, !items.length),
     button(L("Move to Recycle Bin…", "Pindahkan ke Recycle Bin…"), async () => {
-      if (!confirm(L(`Move ${items.length} item(s) (${fmt(total)}) to the Recycle Bin?`, `Pindahkan ${items.length} item (${fmt(total)}) ke Recycle Bin?`))) return;
+      if (!await ask(L(`Move ${items.length} item(s) (${fmt(total)}) to the Recycle Bin?`, `Pindahkan ${items.length} item (${fmt(total)}) ke Recycle Bin?`))) return;
       await trash(items.map((i) => i.path));
     }, true, !items.length),
   ]);
@@ -1051,6 +1196,8 @@ function collectBar() {
 
 /// Recycle Bin for any analysis tool; the backend also drops the items from the scan.
 async function trash(paths) {
+  // a big folder takes a while: say so instead of leaving the screen untouched
+  setFooter([h(`<span>${L(`Moving ${paths.length} item(s) to the Recycle Bin…`, `Memindahkan ${paths.length} item ke Recycle Bin…`)}</span>`)], []);
   const failed = await invoke("trash_paths", { paths }).catch(() => paths);
   const done = new Set(paths.filter((p) => !failed.includes(p)));
   const gone = (p) => done.has(p) || [...done].some((d) => inside(p, d));
@@ -1101,10 +1248,11 @@ const badgeOf = (it) => (it.isDir ? "DIR" : extOf(it.name).slice(0, 4).toUpperCa
 
 // ---------- sorting and dates ----------
 const coll = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
-const FIRST_DIR = { name: "asc", modified: "desc", size: "desc" };
+const FIRST_DIR = { name: "asc", publisher: "asc", modified: "desc", size: "desc" };
 function sortItems(items, s) {
   const d = s.dir === "asc" ? 1 : -1;
   const by = s.key === "name" ? (a, b) => coll.compare(a.name, b.name)
+    : s.key === "publisher" ? (a, b) => coll.compare(a.publisher || "", b.publisher || "")
     : s.key === "modified" ? (a, b) => a.modified - b.modified
     : (a, b) => a.size - b.size;
   return items.slice().sort((a, b) => by(a, b) * d || coll.compare(a.name, b.name));
@@ -1197,7 +1345,12 @@ function selFooter() {
   ]);
 }
 async function recycle(paths) {
-  if (!paths.length || !confirm(L(`Move ${paths.length} item(s) to the Recycle Bin?`, `Pindahkan ${paths.length} item ke Recycle Bin?`))) return;
+  if (!paths.length) return;
+  const chosen = new Set(paths);
+  const risky = state.visible.filter((i) => chosen.has(i.path) && adviceOf(i)?.level === "keep").length;
+  const warn = risky ? "\n\n" + L(`${risky} of them ${risky === 1 ? "is" : "are"} marked "${LEVEL.keep}": deleting can break an app or lose data.`,
+    `${risky} di antaranya ditandai "${LEVEL.keep}": menghapusnya bisa merusak aplikasi atau menghilangkan data.`) : "";
+  if (!await ask(L(`Move ${paths.length} item(s) to the Recycle Bin?`, `Pindahkan ${paths.length} item ke Recycle Bin?`) + warn)) return;
   await trash(paths);
 }
 
@@ -1287,6 +1440,7 @@ function renderTable(o) {
         <span class="badge" style="--k:${k.color}">${esc(badgeOf(it))}</span>
         <div class="tt"><b>${esc(it.name)}</b><small>${esc(parent(it.path))}</small></div>
         ${it.keep ? `<span class="keep">${L("Oldest", "Terlama")}</span>` : ""}
+        ${advPill(adviceOf(it))}
       </div>
       <div class="tmod"><span>${esc(fmtDate(it.modified) || "—")}</span>${o.relative ? `<small>${esc(fmtRel(it.modified))}</small>` : ""}</div>
       <div class="tsize"><b>${fmt(it.size)}</b><i><u style="width:${((it.size / maxSize) * 100).toFixed(1)}%"></u></i></div>
@@ -1447,7 +1601,7 @@ function large() {
   const big = bigEl();
   const draw = () => {
     const q = needle();
-    const rows = state.files.filter((x) => x.size >= f.min && (!f.kind || kindOf(x) === f.kind) && (!q || x.name.toLowerCase().includes(q)));
+    const rows = state.files.filter((x) => x.size >= f.min && (!f.kind || kindOf(x) === f.kind) && (!f.adv || x.advice?.level === f.adv) && (!q || x.name.toLowerCase().includes(q)));
     setBig(big, rows.reduce((s, x) => s + x.size, 0), L(`in ${count(rows.length)} ${rows.length === 1 ? "file" : "files"}`, `dalam ${count(rows.length)} file`));
     renderTable({
       tab: "large", entries: sortItems(rows, state.sort.large), banners: partialBanner(), onSort: draw,
@@ -1459,10 +1613,12 @@ function large() {
   const kinds = [[null, L("All", "Semua")], ...["video", "archive", "disk", "image", "audio", "document", "other"].map((k) => [k, KIND[k].label])];
   const chips = h(`<div class="chiprow"></div>`);
   chips.append(chipGroup(kinds, f.kind, (v) => { f.kind = v; redraw(); }));
+  const advice = h(`<div class="chiprow"><span class="lbl">${L("Advice", "Saran")}</span></div>`);
+  advice.append(chipGroup(ADV_CHIPS, f.adv, (v) => { f.adv = v; redraw(); }));
   $("hero").replaceChildren(big, toolbarEl([
     searchBox(f.q, (v) => { f.q = v; redraw(); }, L("Search file names", "Cari nama file")),
     segmented([[50 << 20, "50 MB"], [100 << 20, "100 MB"], [500 << 20, "500 MB"], [1 << 30, "1 GB"]], f.min, (v) => { f.min = v; redraw(); }),
-  ]), chips);
+  ]), chips, advice);
   draw();
 }
 
@@ -1476,7 +1632,7 @@ function stale() {
     const q = f.q.trim().toLowerCase();
     const cutoff = Date.now() / 1000 - f.age * 30.44 * 86400;
     const rows = state.files.filter((x) => x.modified > 0 && x.modified < cutoff && x.size >= f.min &&
-      (!f.skipApp || !inside(x.path, appData())) && (!q || x.name.toLowerCase().includes(q)));
+      (!f.skipApp || !inside(x.path, appData())) && (!f.adv || x.advice?.level === f.adv) && (!q || x.name.toLowerCase().includes(q)));
     setBig(big, rows.reduce((s, x) => s + x.size, 0), L(`in ${count(rows.length)} ${rows.length === 1 ? "file" : "files"}`, `dalam ${count(rows.length)} file`));
     renderTable({
       tab: "stale", entries: sortItems(rows, state.sort.stale), banners: partialBanner(), relative: true, onSort: draw,
@@ -1493,10 +1649,12 @@ function stale() {
   cb.onchange = () => { f.skipApp = cb.checked; redraw(); };
   const chips = h(`<div class="chiprow"><span class="lbl">${L("Not modified", "Tidak diubah")}</span></div>`);
   chips.append(chipGroup(ages, f.age, (v) => { f.age = v; redraw(); }), skip);
+  const advice = h(`<div class="chiprow"><span class="lbl">${L("Advice", "Saran")}</span></div>`);
+  advice.append(chipGroup(ADV_CHIPS, f.adv, (v) => { f.adv = v; redraw(); }));
   $("hero").replaceChildren(big, toolbarEl([
     searchBox(f.q, (v) => { f.q = v; redraw(); }, L("Search names", "Cari nama")),
     segmented([[1 << 20, "≥ 1 MB"], [10 << 20, "≥ 10 MB"], [100 << 20, "≥ 100 MB"], [1 << 30, "≥ 1 GB"]], f.min, (v) => { f.min = v; redraw(); }),
-  ]), chips);
+  ]), chips, advice);
   draw();
 }
 
@@ -1611,6 +1769,9 @@ function show(tab, keepNote = false) {
   state.home = await invoke("home_dir");
   state.scan.root = state.home;
   await refreshDisk();
-  // nothing is scanned until the user asks, like the macOS app
+  // open on the last scan if there is one; otherwise nothing is scanned until
+  // the user asks, like the macOS app
+  const last = await invoke("load_analysis").catch(() => null);
+  if (last) adoptScan(last);
   show("home");
 })();

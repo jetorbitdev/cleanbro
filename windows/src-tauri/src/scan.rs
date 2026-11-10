@@ -3,6 +3,7 @@
 //! (Large, Stale and Duplicates). The tree stays here; the UI asks for one
 //! folder's children at a time, so browsing never rescans.
 
+use crate::advice::{self, Advice, Env};
 use crate::files::FileInfo;
 use crate::jobs::{Jobs, Progress};
 use rayon::prelude::*;
@@ -11,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// Files at least this big are kept for Large, Stale and Duplicates.
 pub const BIG: u64 = 1 << 20;
@@ -63,11 +64,11 @@ pub(crate) fn dir_size(p: &Path) -> u64 {
 // ---------- analysis tree ----------
 
 pub struct Node {
-    name: Box<str>,
-    size: u64,
+    pub(crate) name: Box<str>,
+    pub(crate) size: u64,
     /// newest modification time of any file inside (seconds, 0 = none)
-    modified: u64,
-    children: Vec<Node>,
+    pub(crate) modified: u64,
+    pub(crate) children: Vec<Node>,
 }
 
 struct Ctx<'a> {
@@ -147,13 +148,42 @@ fn build(dir: &Path, name: Box<str>, ctx: &Ctx, depth: usize, share: u64) -> Nod
     Node { name, size, modified, children }
 }
 
+/// What a finished scan reports about itself; saved with the snapshot.
+#[derive(Clone, Copy, Default)]
+pub struct Meta {
+    pub dirs: u64,
+    pub files: u64,
+    pub unreadable: u64,
+    /// stopped by the user: sizes only cover what was read
+    pub partial: bool,
+    pub secs: f64,
+    /// when the scan ended (seconds since the Unix epoch)
+    pub at: u64,
+}
+
 pub struct Analysis {
-    root: PathBuf,
-    tree: Node,
+    pub(crate) root: PathBuf,
+    pub(crate) tree: Node,
     pub(crate) files: Vec<FileInfo>,
+    pub(crate) meta: Meta,
 }
 
 impl Analysis {
+    fn summary(&self) -> Summary {
+        let m = self.meta;
+        Summary {
+            root: self.root.to_string_lossy().into_owned(),
+            size: self.tree.size,
+            dirs: m.dirs,
+            files: m.files,
+            unreadable: m.unreadable,
+            partial: m.partial,
+            secs: m.secs,
+            at: m.at,
+            big: rated(&self.files, &Env::current()),
+        }
+    }
+
     fn find(&self, p: &Path) -> Option<&Node> {
         let rel = p.strip_prefix(&self.root).ok()?;
         let mut n = &self.tree;
@@ -217,8 +247,26 @@ pub struct Summary {
     /// stopped by the user: sizes only cover what was read
     partial: bool,
     secs: f64,
+    /// when the scan ended (seconds since the Unix epoch)
+    at: u64,
     /// files of 1 MB or more, largest first
-    big: Vec<FileInfo>,
+    big: Vec<Rated>,
+}
+
+/// A file with the advice on deleting it. The advice is worked out when the
+/// list is sent, never stored: it depends on today's date.
+#[derive(Serialize)]
+pub struct Rated {
+    #[serde(flatten)]
+    file: FileInfo,
+    advice: Advice,
+}
+
+pub(crate) fn rated(files: &[FileInfo], env: &Env) -> Vec<Rated> {
+    files
+        .iter()
+        .map(|f| Rated { advice: advice::of_path(&f.path, false, f.modified, env), file: f.clone() })
+        .collect()
 }
 
 /// Own pool with big stacks: the walk recurses once per folder level.
@@ -231,6 +279,12 @@ fn pool() -> &'static rayon::ThreadPool {
             .build()
             .expect("analysis thread pool")
     })
+}
+
+/// Runs `f` on a scan-pool thread, whose stack is big enough to recurse once
+/// per folder level (the snapshot reader and writer do).
+pub(crate) fn on_big_stack<T: Send>(f: impl FnOnce() -> T + Send) -> T {
+    pool().install(f)
 }
 
 /// "C:" means the current folder on drive C; the user means its root.
@@ -264,21 +318,39 @@ pub async fn start_analysis(
         let tree = pool().install(|| build(&root, name, &ctx, 0, PROGRESS_TOTAL));
         let mut big = ctx.big.into_inner().unwrap();
         big.sort_by(|a, b| b.size.cmp(&a.size));
-        let summary = Summary {
-            root: root.to_string_lossy().into_owned(),
-            size: tree.size,
+        let meta = Meta {
             dirs: p.dirs.load(Relaxed),
             files: p.files.load(Relaxed),
             unreadable: ctx.unreadable.load(Relaxed),
             partial: p.cancelled(),
             secs: start.elapsed().as_secs_f64(),
-            big: big.clone(),
+            at: SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0),
         };
-        *store.0.lock().unwrap() = Some(Analysis { root, tree, files: big });
+        let analysis = Analysis { root, tree, files: big, meta };
+        let summary = analysis.summary();
+        crate::snapshot::save(&analysis);
+        *store.0.lock().unwrap() = Some(analysis);
         Ok(summary)
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// The analysis the app should open on: the one already in memory (the page
+/// was reloaded) or else the snapshot of the last scan. None when there is no
+/// usable one.
+#[tauri::command]
+pub async fn load_analysis(store: tauri::State<'_, Arc<Store>>) -> Result<Option<Summary>, String> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut slot = store.0.lock().unwrap();
+        if slot.is_none() {
+            *slot = crate::snapshot::load();
+        }
+        slot.as_ref().map(Analysis::summary)
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[derive(Serialize)]
@@ -289,6 +361,7 @@ pub struct Entry {
     is_dir: bool,
     /// seconds since the Unix epoch; for a folder, its newest file
     modified: u64,
+    advice: Advice,
     /// one more level, only when asked for (the Home treemap)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     children: Vec<Entry>,
@@ -297,31 +370,18 @@ pub struct Entry {
 /// Folders of `node` (sizes from the analysis) and the files directly in `dir`,
 /// largest first. Files are listed fresh: one folder is cheap, and keeping
 /// every file of the scan would cost hundreds of MB.
-fn entries(node: &Node, dir: &Path) -> Vec<Entry> {
-    let mut out: Vec<Entry> = node
-        .children
-        .iter()
-        .map(|c| Entry {
-            name: c.name.to_string(),
-            path: dir.join(&*c.name).to_string_lossy().into_owned(),
-            size: c.size,
-            is_dir: true,
-            modified: c.modified,
-            children: Vec::new(),
-        })
-        .collect();
+fn entries(node: &Node, dir: &Path, env: &Env) -> Vec<Entry> {
+    let entry = |name: String, path: PathBuf, size: u64, is_dir: bool, modified: u64| {
+        let path = path.to_string_lossy().into_owned();
+        Entry { advice: advice::of_path(&path, is_dir, modified, env), name, path, size, is_dir, modified, children: Vec::new() }
+    };
+    let mut out: Vec<Entry> =
+        node.children.iter().map(|c| entry(c.name.to_string(), dir.join(&*c.name), c.size, true, c.modified)).collect();
     if let Ok(rd) = fs::read_dir(dir) {
         for e in rd.flatten() {
             let Ok(m) = e.metadata() else { continue };
             if m.file_type().is_file() {
-                out.push(Entry {
-                    name: e.file_name().to_string_lossy().into_owned(),
-                    path: e.path().to_string_lossy().into_owned(),
-                    size: m.len(),
-                    is_dir: false,
-                    modified: crate::files::mtime(&m),
-                    children: Vec::new(),
-                });
+                out.push(entry(e.file_name().to_string_lossy().into_owned(), e.path(), m.len(), false, crate::files::mtime(&m)));
             }
         }
     }
@@ -343,12 +403,13 @@ pub async fn tree_children(
         let guard = store.0.lock().unwrap();
         let a = guard.as_ref().ok_or("Nothing scanned yet")?;
         let node = a.find(&dir).ok_or_else(|| format!("Not in the last scan: {path}"))?;
-        let mut out = entries(node, &dir);
+        let env = Env::current();
+        let mut out = entries(node, &dir, &env);
         if nested.unwrap_or(false) {
             out.par_iter_mut().filter(|e| e.is_dir).for_each(|e| {
                 let p = PathBuf::from(&e.path);
                 if let Some(n) = node.children.iter().find(|c| *c.name == *e.name) {
-                    e.children = entries(n, &p);
+                    e.children = entries(n, &p, &env);
                 }
             });
         }
@@ -431,7 +492,7 @@ mod tests {
         assert_eq!(files.len(), 1);
         assert_eq!(p.files.load(Relaxed), 2);
 
-        let mut a = Analysis { root: dir.clone(), tree, files };
+        let mut a = Analysis { root: dir.clone(), tree, files, meta: Meta::default() };
         assert_eq!(a.find(&dir.join("a")).unwrap().size, BIG + 10);
         let big = sub.join("big.bin");
         let (size, is_dir) = a.size_of(&big);

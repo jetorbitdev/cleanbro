@@ -422,3 +422,29 @@ input[type=number] { width: 72px; }
 .menu.ctx { position: fixed; right: auto; z-index: 30; }
 .menu button.danger { color: #d14343; }
 .menu button.danger:hover { color: #fff; background: #d14343; }
+
+/* when the shown scan ended */
+.scanage { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.scanage.old { color: #c77700; }
+.crumbs .scanage { margin: 0 4px 0 8px; }
+.crumbs .menu-wrap, .crumbs > .btn.tool { margin-left: 8px; }
+
+/* Uninstall Apps list: sortable header and rows share one grid */
+.apphead, .row.approw { display: grid; grid-template-columns: 18px minmax(0, 1fr) minmax(0, 220px) 90px 24px 14px; column-gap: 12px; align-items: center; }
+.approw .pub { overflow: hidden; text-overflow: ellipsis; }
+
+/* advice: how safe an item is to delete (green = safe, grey = check first, red = keep) */
+.adv {
+  --c: var(--text-2);
+  flex: none; margin-left: auto; padding: 2px 7px; border-radius: 5px; cursor: help;
+  font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--c);
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+}
+.adv.safe { --c: #1a8a4a; }
+.adv.keep { --c: #c93a3a; }
+.tname .keep + .adv { margin-left: 0; }
+.row .txt small .adv { display: inline-block; margin-left: 8px; padding: 0 6px; }
+@media (prefers-color-scheme: dark) {
+  .adv.safe { --c: #4cc38a; }
+  .adv.keep { --c: #f07a7a; }
+}

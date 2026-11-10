@@ -32,6 +32,8 @@ pub struct AppInfo {
     version: String,
     publisher: String,
     size: u64,
+    /// set when the name tells whether the app is needed (a driver, a runtime, ...)
+    advice: Option<crate::advice::Advice>,
 }
 
 #[derive(Serialize)]
@@ -92,7 +94,14 @@ pub async fn list_apps() -> Vec<AppInfo> {
         }
         let mut apps: Vec<AppInfo> = raw
             .into_iter()
-            .map(|a| AppInfo { id: a.id, name: a.name, version: a.version, publisher: a.publisher, size: a.size })
+            .map(|a| AppInfo {
+                advice: crate::advice::of_app(&a.name, &a.publisher),
+                id: a.id,
+                name: a.name,
+                version: a.version,
+                publisher: a.publisher,
+                size: a.size,
+            })
             .collect();
         apps.sort_by_key(|a| a.name.to_lowercase());
         // the same app can be listed in more than one registry view
@@ -190,6 +199,72 @@ fn leftovers_of(app: &RawApp) -> Vec<(PathBuf, &'static str)> {
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out.dedup_by(|a, b| same(&a.0, &b.0));
     out
+}
+
+/// `%NAME%` references in a registry string ("%ProgramFiles%\\App\\unins000.exe").
+fn expand_env(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(a) = rest.find('%') {
+        out.push_str(&rest[..a]);
+        let after = &rest[a + 1..];
+        match after.find('%').and_then(|b| std::env::var(&after[..b]).ok().map(|v| (b, v))) {
+            Some((b, v)) => {
+                out.push_str(&v);
+                rest = &after[b + 1..];
+            }
+            None => {
+                out.push('%');
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The program path at the start of an uninstall command line:
+/// `"C:\\Program Files\\App\\unins000.exe" /SILENT` or an unquoted `C:\\App\\unins000.exe /S`.
+fn exe_of(cmd: &str) -> Option<PathBuf> {
+    let cmd = expand_env(cmd.trim());
+    let path = if let Some(rest) = cmd.strip_prefix('"') {
+        rest[..rest.find('"')?].to_string()
+    } else {
+        let end = cmd.to_lowercase().find(".exe")? + 4;
+        cmd[..end].to_string()
+    };
+    Some(PathBuf::from(path))
+}
+
+/// The folder an app is installed in, as far as the registry tells: its
+/// `InstallLocation`, else the folder of its uninstaller (not Windows' own,
+/// where `msiexec` lives).
+fn install_folder(app: &RawApp) -> Option<PathBuf> {
+    let loc = expand_env(app.install_location.trim());
+    if !loc.is_empty() && Path::new(&loc).is_dir() {
+        return Some(PathBuf::from(loc));
+    }
+    let windir = std::env::var("SystemRoot").or_else(|_| std::env::var("windir")).unwrap_or_default().to_lowercase();
+    let in_windows = |dir: &Path| {
+        !windir.is_empty() && format!("{}\\", dir.to_string_lossy().to_lowercase()).starts_with(&format!("{windir}\\"))
+    };
+    [&app.quiet_uninstall_string, &app.uninstall_string]
+        .into_iter()
+        .filter_map(|c| exe_of(c))
+        .filter(|exe| exe.is_file())
+        .filter_map(|exe| exe.parent().map(Path::to_path_buf))
+        .find(|dir| !in_windows(dir))
+}
+
+/// Opens the app's install folder in Explorer. False when the registry doesn't say where it is.
+#[tauri::command]
+pub async fn reveal_app(id: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(dir) = resolve(&id).and_then(|a| install_folder(&a)) else { return false };
+        std::process::Command::new("explorer").arg(dir).spawn().is_ok()
+    })
+    .await
+    .unwrap_or(false)
 }
 
 #[tauri::command]
@@ -293,6 +368,47 @@ mod tests {
         assert_eq!(fix_msi("MsiExec.exe /I{ABC-123}"), "MsiExec.exe /X{ABC-123}");
         assert_eq!(fix_msi("MsiExec.exe /X{ABC-123}"), "MsiExec.exe /X{ABC-123}");
         assert_eq!(fix_msi("\"C:\\a\\unins000.exe\" /SILENT"), "\"C:\\a\\unins000.exe\" /SILENT");
+    }
+
+    #[test]
+    fn finds_the_program_in_an_uninstall_command() {
+        let p = |s: &str| exe_of(s).map(|p| p.to_string_lossy().into_owned());
+        let want = Some(r"C:\Program Files\App One\unins000.exe".to_string());
+        assert_eq!(p(r#""C:\Program Files\App One\unins000.exe" /SILENT"#), want);
+        assert_eq!(p(r"C:\Program Files\App One\unins000.exe /S"), want);
+        assert_eq!(p("MsiExec.exe /X{ABC}").as_deref(), Some("MsiExec.exe"));
+        assert_eq!(p(""), None);
+        assert_eq!(p("\"unterminated"), None);
+        std::env::set_var("CB_TEST_DIR", r"D:\Apps");
+        assert_eq!(expand_env(r"%CB_TEST_DIR%\x\u.exe"), r"D:\Apps\x\u.exe");
+        assert_eq!(expand_env("100% sure %NOPE_NOT_SET% ok"), "100% sure %NOPE_NOT_SET% ok");
+    }
+
+    #[test]
+    fn install_folder_prefers_the_registry_location_and_skips_windows() {
+        let dir = std::env::temp_dir().join(format!("cleanbro-app-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("unins000.exe");
+        std::fs::write(&exe, b"x").unwrap();
+        let app = |loc: &str, cmd: &str| RawApp {
+            id: "x".into(),
+            name: "App".into(),
+            version: String::new(),
+            publisher: String::new(),
+            install_location: loc.into(),
+            uninstall_string: cmd.into(),
+            quiet_uninstall_string: String::new(),
+            size: 0,
+        };
+        let msi = r"C:\Windows\System32\msiexec.exe /X{ABC}";
+        // the folder of the uninstaller when InstallLocation is empty or gone
+        assert_eq!(install_folder(&app("", &format!("\"{}\" /S", exe.display()))), Some(dir.clone()));
+        assert_eq!(install_folder(&app(r"Z:\gone", &format!("\"{}\" /S", exe.display()))), Some(dir.clone()));
+        // InstallLocation wins when it exists
+        assert_eq!(install_folder(&app(&dir.to_string_lossy(), msi)), Some(dir.clone()));
+        // msiexec lives in Windows: no folder to show
+        assert_eq!(install_folder(&app("", msi)), None);
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
