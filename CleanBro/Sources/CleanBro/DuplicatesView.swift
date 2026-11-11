@@ -161,8 +161,8 @@ private struct DupeRow: View {
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .overlay(Capsule().strokeBorder(.quaternary))
             }
-            Text(Fmt.date(item.modified)).foregroundStyle(.secondary)
-                .frame(width: 100, alignment: .trailing)
+            Text(Fmt.dateTime(item.modified)).foregroundStyle(.secondary)
+                .frame(width: 140, alignment: .trailing)
         }
         .padding(.vertical, 2)
         .contentShape(Rectangle())

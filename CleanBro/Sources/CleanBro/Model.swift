@@ -809,6 +809,12 @@ enum Fmt {
         return f
     }()
 
+    private static let dateTimeF: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM yyyy, HH:mm"
+        return f
+    }()
+
     private static let relF: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .full
@@ -819,6 +825,11 @@ enum Fmt {
         guard d != .distantPast else { return "—" }
         dateF.locale = AppLanguage.current.locale
         return dateF.string(from: d)
+    }
+    static func dateTime(_ d: Date) -> String {
+        guard d != .distantPast else { return "—" }
+        dateTimeF.locale = AppLanguage.current.locale
+        return dateTimeF.string(from: d)
     }
     static func relative(_ d: Date) -> String {
         guard d != .distantPast else { return "" }

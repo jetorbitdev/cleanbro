@@ -168,14 +168,14 @@ struct ItemTable: View {
 
             TableColumn(L("Modified", "Diubah"), value: \.modified) { item in
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(Fmt.date(item.modified))
+                    Text(Fmt.dateTime(item.modified))
                     if showRelativeDate {
                         Text(Fmt.relative(item.modified)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .foregroundStyle(showRelativeDate ? .primary : .secondary)
             }
-            .width(min: 100, ideal: 130, max: 180)
+            .width(min: 130, ideal: 160, max: 200)
 
             TableColumn(L("Size", "Ukuran"), value: \.size) { item in
                 VStack(alignment: .trailing, spacing: 4) {
