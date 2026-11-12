@@ -141,7 +141,8 @@ const freshDupes = (skip = true) => ({ phase: "idle", groups: [], partial: false
 const state = {
   tab: "home",
   home: "",
-  vol: null, // { name, total, free }
+  vol: null, // the system drive, for the sidebar meter: { name, total, free }
+  scanVol: null, // the drive of the scanned folder (can be another drive): { root, name, total, free }
   gen: 0, // bumps on every navigation; late results from an old page are dropped
   // Junk Files: idle -> scanning -> done -> finished, like the macOS app
   junkPhase: "idle",
@@ -234,7 +235,22 @@ async function refreshDisk() {
   $("disk-bar").style.width = `${((d.total - d.free) / d.total) * 100}%`;
   $("disk-bar").classList.toggle("full", (d.total - d.free) / d.total > 0.9);
   $("disk-used").textContent = L(`${fmt(d.total - d.free)} of ${fmt(d.total)} used`, `${fmt(d.total - d.free)} dari ${fmt(d.total)} terpakai`);
+  await refreshScanVol();
 }
+/// The drive the scan is on, which Home and the scan progress measure against.
+async function refreshScanVol() {
+  const root = state.scan.sum?.root || state.scan.root;
+  if (!root) return;
+  const d = sameDrive(root, state.home) ? state.vol : await invoke("disk_info", { path: root }).catch(() => null);
+  state.scanVol = d && { ...d, root };
+}
+const driveOf = (p) => (p.match(/^[A-Za-z]:/)?.[0] || "").toUpperCase();
+const sameDrive = (a, b) => driveOf(a) === driveOf(b);
+/// Volume info for the scanned drive, or null while it is not known yet.
+const scanVol = () => {
+  const root = state.scan.sum?.root || state.scan.root;
+  return state.scanVol && root && sameDrive(state.scanVol.root, root) ? state.scanVol : null;
+};
 
 // ---------- long jobs: progress polling ----------
 /// Polls a running job's counters until the returned stop function is called.
@@ -737,6 +753,7 @@ async function startAnalysis(root = state.scan.root) {
   updateBadges();
   repaintFor("analysis");
   const job = state.scan;
+  refreshScanVol(); // progress on a drive is measured against that drive's used space
   const stop = poll("analysis", (p) => { job.progress = p; repaintFor("analysis", true); });
   const r = await invoke("start_analysis", { root }).catch((e) => ({ error: String(e) }));
   stop();
@@ -747,7 +764,7 @@ async function startAnalysis(root = state.scan.root) {
     adoptScan(r, job.progress);
   }
   updateBadges();
-  refreshDisk();
+  await refreshDisk();
   repaintFor("analysis");
 }
 
@@ -763,7 +780,8 @@ function gate(keepHero = false) {
     // a whole drive: bytes read out of the space in use; a folder: finished
     // subfolders (see PROGRESS_TOTAL in scan.rs). Never goes back, and stays
     // under 100% until the scan really ends.
-    const used = state.vol ? state.vol.total - state.vol.free : 0;
+    const v = scanVol();
+    const used = v ? v.total - v.free : 0;
     const raw = !p ? 0 : isDriveRoot(s.root) && used > 0 ? p.bytes / used : p.total ? p.done / p.total : 0;
     s.frac = Math.min(0.99, Math.max(s.frac || 0, raw));
     const pct = Math.floor(s.frac * 100);
@@ -827,6 +845,7 @@ const CATS = {
   users: { title: L("Users", "Pengguna"), color: "#3b6b9e", help: L("User folders in C:\\Users", "Folder pengguna di C:\\Users") },
   apps: { title: L("Applications", "Aplikasi"), color: "#b8945c", help: L("Programs in Program Files", "Program di Program Files") },
   system: { title: L("System", "Sistem"), color: "#6ba178", help: L("Windows, ProgramData and other system folders", "Windows, ProgramData dan folder sistem lain") },
+  files: { title: L("Folders & Files", "Folder & File"), color: "#3b6b9e", help: L("Everything the scan read on this drive", "Semua yang terbaca pemindaian di drive ini") },
   other: {
     title: L("Other Space", "Ruang lain"), color: "#c4c4c4", light: true,
     help: L("Space in use that the scan couldn't read: folders without permission, System Volume Information, restore points, and files Windows keeps open",
@@ -919,6 +938,10 @@ async function categories(nested) {
   const top = await kids(root);
   if (!top) return null;
   const rootSize = top.reduce((s, e) => s + e.size, 0);
+  const v = scanVol();
+  const other = { id: "other", size: Math.max(0, v ? v.total - v.free - rootSize : 0), raw: [] };
+  // a data drive has no Users or Program Files: its folders are one category
+  if (!systemDrive()) return [{ id: "files", size: rootSize, raw: nested ? (await kids(root, true)) || [] : top }, other];
   const users = top.find((e) => e.is_dir && e.name.toLowerCase() === "users");
   const apps = top.filter((e) => e.is_dir && /^program files( \(x86\))?$/i.test(e.name));
   const userRaw = [];
@@ -933,14 +956,15 @@ async function categories(nested) {
   let sysRaw = top.filter((e) => e !== users && !apps.includes(e));
   if (nested) sysRaw = ((await kids(root, true)) || []).filter((e) => !(users && samePath(e.path, users.path)) && !apps.some((a) => samePath(a.path, e.path)));
   const usersSize = users?.size || 0, appsSize = apps.reduce((s, a) => s + a.size, 0);
-  const used = state.vol ? state.vol.total - state.vol.free : 0;
   return [
     { id: "users", size: usersSize, raw: userRaw },
     { id: "apps", size: appsSize, raw: appRaw },
     { id: "system", size: Math.max(0, rootSize - usersSize - appsSize), raw: sysRaw },
-    { id: "other", size: Math.max(0, used - rootSize), raw: [] },
+    other,
   ];
 }
+/// True when the scan is of the drive Windows (and the user's profile) is on.
+const systemDrive = () => sameDrive(state.scan.sum?.root || state.scan.root || "", state.home);
 
 /// Blocks for the current Home level, cached until the scan or a delete changes them.
 async function level(focus) {
@@ -973,16 +997,16 @@ const homeDefault = () => (homeIsDisk() ? { kind: "overview" } : { kind: "node",
 function crumbs(focus) {
   const root = state.scan.sum.root;
   const disk = homeIsDisk();
-  const out = [{ title: disk ? state.vol?.name || root : root, focus: null }];
+  const out = [{ title: disk ? scanVol()?.name || root : root, focus: null }];
   if (focus.kind === "cat") out.push({ title: CATS[focus.id].title, focus });
   if (focus.kind !== "node" || samePath(focus.path, root)) return out;
   const parts = focus.path.slice(root.replace(/\\$/, "").length + 1).split("\\");
   let chain = parts.map((_, i) => root.replace(/\\$/, "") + "\\" + parts.slice(0, i + 1).join("\\"));
   if (disk) {
     const first = parts[0].toLowerCase();
-    const cat = first === "users" ? "users" : /^program files( \(x86\))?$/.test(first) ? "apps" : "system";
+    const cat = !systemDrive() ? "files" : first === "users" ? "users" : /^program files( \(x86\))?$/.test(first) ? "apps" : "system";
     out.push({ title: CATS[cat].title, focus: { kind: "cat", id: cat } });
-    if (cat !== "system") chain = chain.slice(1);
+    if (cat === "users" || cat === "apps") chain = chain.slice(1);
     // the users category already shows what is in the home folder
     if (cat === "users" && chain.length > 1 && samePath(chain[0], state.home)) chain = chain.slice(1);
   }
@@ -996,10 +1020,10 @@ function statCard(title, value, detail, highlight, action) {
 }
 
 function homeHeader(focus) {
-  const v = state.vol;
+  const v = scanVol();
   const used = v ? v.total - v.free : 0;
   const head = h(`<div class="crumbs"></div>`);
-  const cs = state.scan.phase === "done" ? crumbs(focus) : [{ title: v?.name || drive(), focus: null }];
+  const cs = state.scan.phase === "done" ? crumbs(focus) : [{ title: v?.name || driveOf(state.scan.root || drive()) || drive(), focus: null }];
   if (cs.length > 1) {
     const back = h(`<button class="iconbtn" title="${L("Back", "Kembali")}">${svg("back", "")}</button>`);
     back.onclick = () => { state.homeFocus = cs[cs.length - 2].focus; repaint(); };
@@ -1136,10 +1160,10 @@ function drawMap(blocks, focus) {
 
   // side panel: what this level is, then every block as a row
   const side = map.querySelector(".side");
-  const v = state.vol;
+  const v = scanVol();
   const total = focus.kind === "overview" && v ? v.total - v.free : blocks.reduce((s, b) => s + b.size, 0);
   const kind = { overview: L("Disk", "Disk"), cat: L("Category", "Kategori"), node: L("Folder", "Folder") }[focus.kind];
-  const title = focus.kind === "overview" ? v?.name || drive() : focus.kind === "cat" ? CATS[focus.id].title : baseName(focus.path);
+  const title = focus.kind === "overview" ? v?.name || state.scan.sum.root :focus.kind === "cat" ? CATS[focus.id].title : baseName(focus.path);
   const path = focus.kind === "overview" ? state.scan.sum.root : focus.kind === "cat" ? CATS[focus.id].help : focus.path;
   side.append(h(`<div class="side-head"><small>${esc(kind)}</small><b>${esc(title)}</b><span class="p">${esc(path)}</span>
     <div class="side-size"><strong>${fmt(total)}</strong><span>${L(`${blocks.length} items`, `${blocks.length} item`)}</span></div></div>`));
@@ -1768,10 +1792,10 @@ function show(tab, keepNote = false) {
   initSidebar();
   state.home = await invoke("home_dir");
   state.scan.root = state.home;
-  await refreshDisk();
   // open on the last scan if there is one; otherwise nothing is scanned until
   // the user asks, like the macOS app
   const last = await invoke("load_analysis").catch(() => null);
   if (last) adoptScan(last);
+  await refreshDisk(); // after the scan is known, so its drive is measured too
   show("home");
 })();
