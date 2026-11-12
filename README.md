@@ -12,6 +12,7 @@ Two tools for inspecting and tidying up disk usage on macOS:
 ## Table of contents
 
 - [Install the app](#install-the-app)
+- [CleanBro for Windows](#cleanbro-for-windows)
 - [cleanbro (CLI)](#cleanbro-cli)
   - [Install](#install)
   - [Build](#build)
@@ -49,6 +50,18 @@ It downloads the latest release, verifies its checksum, installs it to `/Applica
 **3. Build from source**: see [Build](#build-1) below.
 
 On first launch, CleanBro asks for **Full Disk Access**. Click **Buka Pengaturan** (Open Settings), turn on CleanBro in the list (or drag it in from the Finder window that opens), then reopen the app.
+
+## CleanBro for Windows
+
+> Early preview: Cleanup, Uninstall Apps, Disk Usage, Large Files, Stale Files and Duplicates work so far. See [windows/README.md](windows/README.md) for progress.
+
+Requires Windows 10 or later (64-bit). Paste this into PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/jetorbitdev/cleanbro/main/install.ps1 | iex
+```
+
+It downloads the latest release, verifies it against the SHA-256 digest GitHub records, and installs CleanBro for the current user (no admin rights needed). Or download `CleanBro-windows-setup.exe` from the [latest release](https://github.com/jetorbitdev/cleanbro/releases/latest); the installer isn't code-signed yet, so SmartScreen may warn: click **More info → Run anyway**.
 
 ## cleanbro (CLI)
 
@@ -224,7 +237,9 @@ git push origin v1.0.0
 .
 ├── main.go            # cleanbro CLI source
 ├── go.mod
-├── install.sh         # one-line installer for the app
+├── install.sh         # one-line installer for the macOS app
+├── install.ps1        # one-line installer for the Windows app
+├── windows/           # Windows app (Tauri: Rust backend + web UI)
 ├── CleanBro/
 │   ├── Package.swift
 │   ├── build.sh       # build & bundle the .app
