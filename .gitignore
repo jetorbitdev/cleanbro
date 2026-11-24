@@ -24,3 +24,6 @@ DerivedData/
 # Promo video (lokal saja)
 promo/
 docs
+# Windows (Tauri) port — local only
+windows/src-tauri/
+windows/node_modules/
