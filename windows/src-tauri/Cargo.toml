@@ -1,0 +1,26 @@
+[package]
+name = "cleanbro-windows"
+version = "0.1.0"
+edition = "2021"
+description = "CleanBro for Windows"
+license = "GPL-3.0"
+
+[lib]
+name = "cleanbro_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11.1"
+rayon = "1.12.0"
+trash = "5.3.0"
+sysinfo = { version = "0.40.1", default-features = false, features = ["disk"] }
+tauri-plugin-dialog = "2"
+
+[target."cfg(windows)".dependencies]
+winreg = "0.56.0"
