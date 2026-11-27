@@ -595,6 +595,16 @@ struct HomeView: View {
                     Text(Fmt.size(panelSize)).font(.system(size: 24, weight: .medium)).monospacedDigit()
                     Text(panelCount)
                         .font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    if case .node(let p) = current {
+                        Button {
+                            model.reveal([p])
+                        } label: {
+                            Label(L("Show in Finder", "Tampilkan di Finder"), systemImage: "folder")
+                        }
+                        .controlSize(.small)
+                        .help(L("Show this folder in Finder", "Tampilkan folder ini di Finder"))
+                    }
                 }
                 .padding(.top, 8)
             }
